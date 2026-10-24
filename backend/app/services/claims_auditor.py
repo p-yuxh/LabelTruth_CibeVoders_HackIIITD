@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from app.services.personalized_scoring import PersonalizedScoringEngine
 from app.services.reference_standards import ReferenceStandardsRegistry
+from app.services.independent_evidence_service import IndependentEvidenceService
 
 logger = logging.getLogger("labeltruth.auditor")
 
@@ -86,10 +87,25 @@ class LabelTruthClaimsAuditor:
         raw_claims = agent_data.get("front_pack_claims", [])
         audited_claims = self._audit_claims(raw_claims, nutrition, contains_palm_oil, ingredients_list, product_url)
 
-        # 5. Lab-Test / Regulatory Coverage Summary (Consumer Voice, Trustified)
+        # 5. Independent Evidence Service (Section 1: Lab/Regulatory & Section 2: Social Unverified)
+        evidence_service = IndependentEvidenceService()
+        independent_evidence = evidence_service.get_evidence_for_product(
+            query=query,
+            product_name=product_name,
+            brand=brand,
+            claims=audited_claims,
+        )
+
+        # Apply Section 1 accepted evidence to inform claim verdicts (Section 1 only!)
+        audited_claims = evidence_service.apply_evidence_to_claim_verdicts(
+            claims=audited_claims,
+            evidence=independent_evidence,
+        )
+
+        # 6. Lab-Test / Regulatory Coverage Summary (Consumer Voice, Trustified)
         lab_coverage = self._summarize_lab_coverage(search_results, lab_url)
 
-        # 6. Personalized Scoring Engine (Personalised Rating 1-10)
+        # 7. Personalized Scoring Engine (Personalised Rating 1-10; completely untouched by evidence)
         scoring_engine = PersonalizedScoringEngine()
         personalized_eval = scoring_engine.evaluate(
             product_data={
@@ -102,11 +118,11 @@ class LabelTruthClaimsAuditor:
             user_allergens=user_allergens or [],
         )
 
-        # 7. Statutory Reference Standards Registry
+        # 8. Statutory Reference Standards Registry
         registry = ReferenceStandardsRegistry(default_share_of_daily=share_of_daily)
         citations = registry.get_all_citations_for_product(audited_claims, ingredients_list)
 
-        # 8. Concise, objective audit summary
+        # 9. Concise, objective audit summary
         summary = self._generate_summary(
             product_name=product_name,
             nutrition=nutrition,
@@ -129,6 +145,7 @@ class LabelTruthClaimsAuditor:
             },
             "front_pack_claims": audited_claims,
             "lab_test_coverage": lab_coverage,
+            "independent_evidence": independent_evidence,
             "summary": summary,
             "personalized_scoring": personalized_eval,
             "reference_standards": citations,

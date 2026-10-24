@@ -79,6 +79,7 @@ class ProductAuditData(BaseModel):
     oil_listed: OilListed
     front_pack_claims: List[FrontPackClaim] = []
     lab_test_coverage: LabTestCoverage = LabTestCoverage()
+    independent_evidence: Optional[Dict[str, Any]] = None
     summary: str
     personalized_scoring: Optional[Dict[str, Any]] = None
     reference_standards: Optional[List[Dict[str, Any]]] = None

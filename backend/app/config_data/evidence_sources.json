@@ -1,0 +1,62 @@
+{
+  "source_tiers": {
+    "tier_a": {
+      "name": "Tier A: Regulators & Government",
+      "description": "Statutory authorities, government ministries, state food safety departments, and official product recall or safety notifications.",
+      "entities": [
+        "FSSAI (Food Safety and Standards Authority of India)",
+        "Ministry of Consumer Affairs",
+        "State Food Safety Administrations",
+        "NCPCR (National Commission for Protection of Child Rights)"
+      ],
+      "affects_verdict": true,
+      "badge_color": "neutral-dark",
+      "priority": 1
+    },
+    "tier_b": {
+      "name": "Tier B: FSSAI-Notified & NABL-Accredited Labs",
+      "description": "Independent analytical testing laboratories officially notified by FSSAI or listed in the National Accreditation Board for Testing and Calibration Laboratories (NABL) directory with valid scope.",
+      "entities": [
+        "NABL-Accredited Analytical Labs",
+        "FSSAI Notified National Food Laboratories",
+        "CFL (Central Food Laboratory)",
+        "CFTRI (Central Food Technological Research Institute)"
+      ],
+      "affects_verdict": true,
+      "badge_color": "neutral-medium",
+      "priority": 2
+    },
+    "tier_c": {
+      "name": "Tier C: Independent Testing Organisations",
+      "description": "Independent consumer advocacy testing organisations and comparative testing platforms. Include Trustified ONLY when the primary underlying laboratory report PDF is attached or directly accessible.",
+      "entities": [
+        "Consumer Voice (consumer-voice.org)",
+        "Ministry of Consumer Affairs Comparative Testing (consumeraffairs.nic.in)",
+        "Centre for Science and Environment (CSE)",
+        "Consumer Education and Research Centre (CERC)",
+        "Trustified (with verified lab report attached)",
+        "Which?",
+        "Consumer Reports"
+      ],
+      "affects_verdict": true,
+      "badge_color": "neutral-subtle",
+      "priority": 3
+    },
+    "tier_d": {
+      "name": "Tier D: Peer-Reviewed Studies & Composition Data",
+      "description": "Peer-reviewed scientific journals, academic studies, and national food composition reference tables (e.g. ICMR-NIN Indian Food Composition Tables). Shown for educational context only; never changes a verdict.",
+      "entities": [
+        "ICMR-NIN Food Composition Tables",
+        "Peer-reviewed Nutrition Science Journals",
+        "Academic Food Safety Theses"
+      ],
+      "affects_verdict": false,
+      "badge_color": "neutral-light",
+      "priority": 4
+    }
+  },
+  "creator_rules": {
+    "section_1_requirement": "Creator content enters Section 1 ONLY if it directly links an original, accessible laboratory test report or official regulatory document that strictly satisfies all 7 acceptance rules. Otherwise, it is placed in Section 2 as unverified social commentary."
+  }
+}
+

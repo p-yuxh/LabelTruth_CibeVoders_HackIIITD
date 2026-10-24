@@ -3,6 +3,7 @@ import { ExternalLink, AlertTriangle, CheckCircle, ShieldAlert, FileText, Scale 
 import PersonalizedScoringSection from './PersonalizedScoringSection';
 import ClaimVerdictTag from './ClaimVerdictTag';
 import ReferenceStandardsSection from './ReferenceStandardsSection';
+import IndependentEvidenceSection from './IndependentEvidenceSection';
 
 export default function ProductCard({ data }) {
   if (!data) return null;
@@ -16,6 +17,7 @@ export default function ProductCard({ data }) {
     oil_listed,
     front_pack_claims = [],
     lab_test_coverage,
+    independent_evidence,
     summary,
     personalized_scoring,
     reference_standards = [],
@@ -281,27 +283,13 @@ export default function ProductCard({ data }) {
             </div>
           )}
 
-          {/* Consumer Lab & Regulatory Reports */}
-          {lab_test_coverage && (
-            <div style={{ background: '#000000', border: '1px solid #2a2a2a', padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ffffff', marginBottom: '6px' }}>
-                <FileText size={16} />
-                <strong style={{ fontSize: '0.88rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Independent Lab & Regulatory Coverage</strong>
-              </div>
-              <p style={{ fontSize: '0.85rem', color: '#a3a3a3', lineHeight: 1.5 }}>
-                {lab_test_coverage.summary || 'No adverse regulatory test findings on record.'}
-              </p>
-              {lab_test_coverage.source_url && (
-                <div style={{ marginTop: '8px' }}>
-                  <a href={lab_test_coverage.source_url} target="_blank" rel="noreferrer" className="citation-link">
-                    <ExternalLink size={12} /> View Reference Report
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
+
+      {/* =========================================
+          MIDDLE: Independent Evidence (Section 1: Lab & Section 2: Social)
+         ========================================= */}
+      <IndependentEvidenceSection evidence={independent_evidence} />
 
       {/* =========================================
           BOTTOM: Statutory Standards & Provenance Citations

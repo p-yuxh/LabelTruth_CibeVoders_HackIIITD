@@ -1,0 +1,39 @@
+{
+  "thresholds_years": {
+    "recent_max_years": 2.0,
+    "ageing_max_years": 5.0
+  },
+  "verdict_rules": {
+    "allow_old_for_verdict": false,
+    "tolerance_pct": 15.0
+  },
+  "badges": {
+    "recent": {
+      "label": "Recent",
+      "badge_class": "badge-age-recent",
+      "color_token": "green-grey",
+      "description": "Tested within the last 2 years. Eligible to inform claim verdicts when matching."
+    },
+    "ageing": {
+      "label": "Ageing",
+      "badge_class": "badge-age-ageing",
+      "color_token": "amber",
+      "description": "Tested between 2 and 5 years ago. Shown as context; product formulation may have changed."
+    },
+    "old": {
+      "label": "Old / historical",
+      "badge_class": "badge-age-old",
+      "color_token": "red-grey",
+      "description": "Tested more than 5 years ago. Provided strictly as historical context; does not set CONTRADICTED."
+    },
+    "unknown": {
+      "label": "Date unknown",
+      "badge_class": "badge-age-unknown",
+      "color_token": "grey",
+      "description": "Batch or publication date not stated. Treated as historical context."
+    }
+  },
+  "standard_disclaimer": "Reported evidence for the tested batch, not proof of wrongdoing.",
+  "batch_note": "Results apply to the batch tested; the product may have changed since."
+}
+

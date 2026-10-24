@@ -10,6 +10,7 @@ from app.services.tinyfish_scraper import TinyFishScraperService
 from app.services.claims_auditor import LabelTruthClaimsAuditor
 from app.services.personalized_scoring import PersonalizedScoringEngine
 from app.services.reference_standards import ReferenceStandardsRegistry
+from app.services.independent_evidence_service import IndependentEvidenceService
 
 logger = logging.getLogger("labeltruth.orchestrator")
 
@@ -79,6 +80,21 @@ class AuditOrchestrator:
                         product_data.get("front_pack_claims", []),
                         product_data.get("ingredients", [])
                     )
+
+                # Independent Evidence evaluation (Section 1: Lab/Regulatory & Section 2: Social Opinions)
+                evidence_service = IndependentEvidenceService()
+                p_name_val = product_data.get("product_name", {}).get("value", cleaned_query)
+                p_brand_val = product_data.get("brand", {}).get("value", "")
+                product_data["independent_evidence"] = evidence_service.get_evidence_for_product(
+                    query=cleaned_query,
+                    product_name=p_name_val,
+                    brand=p_brand_val,
+                    claims=product_data.get("front_pack_claims", []),
+                )
+                product_data["front_pack_claims"] = evidence_service.apply_evidence_to_claim_verdicts(
+                    claims=product_data.get("front_pack_claims", []),
+                    evidence=product_data["independent_evidence"],
+                )
 
                 # Fetch candidate category products from evidence log
                 stmt_recs = select(EvidenceLog).order_by(EvidenceLog.created_at.desc()).limit(30)
