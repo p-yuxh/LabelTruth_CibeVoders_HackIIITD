@@ -227,6 +227,84 @@ body {
   accent-color: #ffffff;
 }
 
+/* Image Attachment Component */
+.image-attach-btn {
+  background: #000000;
+  border: 1px solid var(--border-light);
+  border-right: none;
+  color: var(--text-muted);
+  padding: 0 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.image-attach-btn:hover {
+  background: #181818;
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+.image-preview-strip {
+  background: #000000;
+  border: 1px solid var(--border-light);
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.image-preview-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.image-preview-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border: 1px solid #404040;
+}
+
+.image-detected-tag {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.image-detected-sub {
+  font-size: 0.74rem;
+  color: #888888;
+}
+
+.btn-remove-image {
+  background: transparent;
+  border: 1px solid #404040;
+  color: #ffffff;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: uppercase;
+}
+
+.btn-remove-image:hover {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+}
+
 /* Status Banner */
 .cache-banner {
   background: var(--bg-secondary);

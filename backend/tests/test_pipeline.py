@@ -9,6 +9,9 @@ from app.models.evidence_log import EvidenceLog
 from app.services.tinyfish_scraper import TinyFishScraperService
 from app.services.claims_auditor import LabelTruthClaimsAuditor
 from app.services.orchestrator import AuditOrchestrator
+from app.services.image_detector import ProductImageDetector
+from PIL import Image, ImageDraw
+import io
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -106,6 +109,62 @@ async def test_api_health_endpoint():
         data = response.json()
         assert data["status"] == "healthy"
         assert data["tinyfish_api_configured"] is True
+
+
+@pytest.mark.asyncio
+async def test_image_detector_service():
+    detector = ProductImageDetector()
+    img = Image.new('RGB', (450, 120), color='white')
+    draw = ImageDraw.Draw(img)
+    draw.text((25, 40), "Cadbury Bournvita 500g", fill='black')
+    
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    
+    res = detector.detect_product_from_bytes(buf.getvalue())
+    assert "Bournvita" in res["detected_product"]
+    assert res["match_source"] == "pattern_match"
+
+
+@pytest.mark.asyncio
+async def test_detect_image_endpoint():
+    img = Image.new('RGB', (450, 120), color='white')
+    draw = ImageDraw.Draw(img)
+    draw.text((25, 40), "Nestle Maggi Noodles", fill='black')
+    
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        files = {"file": ("test_package.png", buf.getvalue(), "image/png")}
+        response = await client.post("/api/detect-image", files=files)
+        assert response.status_code == 200
+        data = response.json()
+        assert "Maggi" in data["detected_product"]
+
+
+@pytest.mark.asyncio
+async def test_audit_image_endpoint(async_db):
+    app.dependency_overrides[get_db] = lambda: async_db
+    
+    img = Image.new('RGB', (450, 120), color='white')
+    draw = ImageDraw.Draw(img)
+    draw.text((25, 40), "Cadbury Bournvita 500g", fill='black')
+    
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        files = {"file": ("bournvita.png", buf.getvalue(), "image/png")}
+        response = await client.post("/api/audit-image", files=files)
+        assert response.status_code == 200
+        data = response.json()
+        assert "Cadbury" in data["data"]["product_name"]["value"]
+        assert data["data"]["oil_listed"] is not None
+
+    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

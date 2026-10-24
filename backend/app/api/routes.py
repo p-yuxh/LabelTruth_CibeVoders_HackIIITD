@@ -1,6 +1,6 @@
 import logging
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,11 +12,13 @@ from app.schemas.product import (
     EvidenceLogItem,
 )
 from app.services.orchestrator import AuditOrchestrator
+from app.services.image_detector import ProductImageDetector
 from app.config import settings
 
 logger = logging.getLogger("labeltruth.api")
 router = APIRouter()
 orchestrator = AuditOrchestrator()
+image_detector = ProductImageDetector()
 
 
 @router.post(
@@ -42,6 +44,67 @@ async def audit_product(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Audit failed: {str(exc)}",
         )
+
+
+@router.post(
+    "/detect-image",
+    summary="Detect Product from Packaging Image",
+    description="Accepts an uploaded image file of product packaging and extracts the identified product name using OCR & brand matching."
+)
+async def detect_image(
+    file: UploadFile = File(..., description="Image file of the food product packaging (JPEG, PNG, WEBP)"),
+):
+    try:
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+        
+        detection_result = image_detector.detect_product_from_bytes(content)
+        return detection_result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        logger.exception(f"Image detection error: {exc}")
+        raise HTTPException(status_code=500, detail=f"Failed to process image: {str(exc)}")
+
+
+@router.post(
+    "/audit-image",
+    response_model=AuditResponse,
+    summary="Direct Product Audit from Packaging Image",
+    description="Upload an image of a food package to automatically detect the product and execute the full claims audit."
+)
+async def audit_image(
+    file: UploadFile = File(..., description="Image file of the food product packaging"),
+    force_refresh: bool = Form(False, description="Bypass cache and force fresh web extraction"),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+        
+        detection_result = image_detector.detect_product_from_bytes(content)
+        product_query = detection_result.get("detected_product", "").strip()
+        
+        if not product_query or product_query == "Packaged Food Product":
+            raise HTTPException(
+                status_code=422, 
+                detail="Could not clearly identify a brand or product name from the image. Please try a clearer photo or enter the name manually."
+            )
+        
+        logger.info(f"Image auto-detected product '{product_query}'. Running audit...")
+        result = await orchestrator.audit_product(
+            session=db,
+            query=product_query,
+            force_refresh=force_refresh,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(f"Direct image audit error: {exc}")
+        raise HTTPException(status_code=500, detail=f"Image audit failed: {str(exc)}")
 
 
 @router.get(
