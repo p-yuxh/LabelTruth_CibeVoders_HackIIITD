@@ -36,6 +36,10 @@ class AuditOrchestrator:
         session: AsyncSession,
         query: str,
         force_refresh: bool = False,
+        profile: str = "general_health",
+        strict_palm_oil: bool = False,
+        goals: Optional[list] = None,
+        share_of_daily: float = 0.15,
     ) -> Dict[str, Any]:
         cleaned_query = query.strip()
         normalized_query_key = cleaned_query.lower()
@@ -53,13 +57,53 @@ class AuditOrchestrator:
 
             if cached_entry:
                 logger.info(f"CACHE HIT: Returning cached evidence log #{cached_entry.id} for '{cleaned_query}'")
+                product_data = dict(cached_entry.product_data)
+                
+                # Dynamic personalization on cache hit
+                from app.services.personalized_scoring import PersonalizedScoringEngine
+                from app.services.reference_standards import ReferenceStandardsRegistry
+                
+                scoring_engine = PersonalizedScoringEngine(share_of_daily=share_of_daily)
+                oil_data = product_data.get("oil_listed", {})
+                contains_palm = oil_data.get("is_palm_oil", False)
+                oil_val = oil_data.get("value", "")
+                
+                eval_payload = {
+                    "nutrition": product_data.get("nutrition", {}),
+                    "oil_listed": {"value": oil_val, "is_palm_oil": contains_palm},
+                    "ingredients": product_data.get("ingredients", [])
+                }
+                
+                all_profiles = scoring_engine.evaluate_all_three_profiles(
+                    eval_payload,
+                    strict_palm_oil_avoidance=strict_palm_oil,
+                    preferred_goals=goals,
+                    share_of_daily=share_of_daily
+                )
+                selected_score = scoring_engine.evaluate_personalized_fit(
+                    eval_payload,
+                    profile_key=profile,
+                    strict_palm_oil_avoidance=strict_palm_oil,
+                    preferred_goals=goals,
+                    share_of_daily=share_of_daily
+                )
+                selected_score["all_profiles"] = all_profiles
+                product_data["personalized_scoring"] = selected_score
+
+                if not product_data.get("reference_standards"):
+                    registry = ReferenceStandardsRegistry(default_share_of_daily=share_of_daily)
+                    product_data["reference_standards"] = registry.get_all_citations_for_product(
+                        product_data.get("front_pack_claims", []),
+                        product_data.get("ingredients", [])
+                    )
+
                 return {
                     "query": cleaned_query,
                     "is_cached": True,
                     "evidence_log_id": cached_entry.id,
                     "created_at": cached_entry.created_at.isoformat() if cached_entry.created_at else datetime.now(timezone.utc).isoformat(),
                     "source_urls": cached_entry.source_urls or [],
-                    "data": cached_entry.product_data,
+                    "data": product_data,
                     "tinyfish_agent_raw": cached_entry.raw_tinyfish_output.get("agent_data") if cached_entry.raw_tinyfish_output else None,
                 }
 
@@ -69,7 +113,14 @@ class AuditOrchestrator:
         tinyfish_result = self.scraper.run_full_pipeline(cleaned_query)
 
         # Step 3: Data Normalization & Claims Audit Layer
-        normalized_data = self.auditor.normalize_and_audit(cleaned_query, tinyfish_result)
+        normalized_data = self.auditor.normalize_and_audit(
+            query=cleaned_query,
+            tinyfish_data=tinyfish_result,
+            profile=profile,
+            strict_palm_oil=strict_palm_oil,
+            goals=goals,
+            share_of_daily=share_of_daily
+        )
 
         # Step 4: Persist to PostgreSQL Evidence Log
         product_name = normalized_data.get("product_name", {}).get("value")

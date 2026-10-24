@@ -1,72 +1,152 @@
 const API_BASE = '/api';
 
-export async function auditProduct(query, forceRefresh = false) {
-  const response = await fetch(`${API_BASE}/audit`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      query,
-      force_refresh: forceRefresh,
-    }),
-  });
+export async function auditProduct(query, forceRefresh = false, profile = 'general_health', strictPalmOil = false, goals = [], shareOfDaily = 0.15) {
+  try {
+    const response = await fetch(`${API_BASE}/audit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        force_refresh: forceRefresh,
+        profile,
+        strict_palm_oil: strictPalmOil,
+        goals,
+        share_of_daily: shareOfDaily,
+      }),
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `Audit request failed with status ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Audit request failed with status ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (err) {
+    if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
+      throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000 (uvicorn app.main:app --app-dir backend --port 8000).');
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
 export async function auditWithImage(imageFile, forceRefresh = false) {
-  const formData = new FormData();
-  formData.append('file', imageFile);
-  formData.append('force_refresh', forceRefresh);
+  try {
+    const formData = new FormData();
+    formData.append('file', imageFile);
+    formData.append('force_refresh', forceRefresh);
 
-  const response = await fetch(`${API_BASE}/audit-image`, {
-    method: 'POST',
-    body: formData,
-  });
+    const response = await fetch(`${API_BASE}/audit-image`, {
+      method: 'POST',
+      body: formData,
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || `Image audit failed with status ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Image audit failed with status ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (err) {
+    if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
+      throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000.');
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
 export async function detectProductFromImage(imageFile) {
-  const formData = new FormData();
-  formData.append('file', imageFile);
+  try {
+    const formData = new FormData();
+    formData.append('file', imageFile);
 
-  const response = await fetch(`${API_BASE}/detect-image`, {
-    method: 'POST',
-    body: formData,
-  });
+    const response = await fetch(`${API_BASE}/detect-image`, {
+      method: 'POST',
+      body: formData,
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || 'Could not recognize product from image.');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Could not recognize product from image.');
+    }
+
+    return await response.json();
+  } catch (err) {
+    if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
+      throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000.');
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
 export async function fetchEvidenceLogs(limit = 30, offset = 0) {
-  const response = await fetch(`${API_BASE}/evidence-logs?limit=${limit}&offset=${offset}`);
-  if (!response.ok) {
-    throw new Error('Failed to retrieve evidence logs');
+  try {
+    const response = await fetch(`${API_BASE}/evidence-logs?limit=${limit}&offset=${offset}`);
+    if (!response.ok) {
+      throw new Error('Failed to retrieve evidence logs');
+    }
+    return await response.json();
+  } catch (err) {
+    if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
+      throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000.');
+    }
+    throw err;
   }
-  return response.json();
+}
+
+export async function calculatePersonalizedScore(productData, profile = 'general_health', strictPalmOil = false, goals = [], shareOfDaily = 0.15) {
+  try {
+    const response = await fetch(`${API_BASE}/score-personal`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        product_data: productData,
+        profile,
+        strict_palm_oil: strictPalmOil,
+        goals,
+        share_of_daily: shareOfDaily,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Failed to compute personalized score.');
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error('Error in calculatePersonalizedScore:', err);
+    throw err;
+  }
+}
+
+export async function fetchReferenceStandards(shareOfDaily = 0.15) {
+  try {
+    const response = await fetch(`${API_BASE}/reference-standards?share_of_daily=${shareOfDaily}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch reference standards');
+    }
+    return await response.json();
+  } catch (err) {
+    console.error('Error fetching reference standards:', err);
+    throw err;
+  }
 }
 
 export async function checkBackendHealth() {
-  const response = await fetch(`${API_BASE}/health`);
-  if (!response.ok) {
-    throw new Error('Backend health check failed');
+  try {
+    const response = await fetch(`${API_BASE}/health`);
+    if (!response.ok) {
+      throw new Error('Backend health check failed');
+    }
+    return await response.json();
+  } catch (err) {
+    if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
+      throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000.');
+    }
+    throw err;
   }
-  return response.json();
 }

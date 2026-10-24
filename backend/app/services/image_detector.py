@@ -14,6 +14,30 @@ except ImportError:
 
 # Comprehensive mapping of Indian FMCG brands and products
 KNOWN_PRODUCTS = [
+    # Chips & Savory Snacks
+    (r"\blay['\s]?s|\blays\b", "Lays Potato Chips India"),
+    (r"\b(?:potato\s*chips|salted\s*chips|magic\s*masala)\b", "Lays Potato Chips India"),
+    (r"\bkurkure", "Kurkure Masala Munch"),
+    (r"\btoo\s*yumm", "Too Yumm Multigrain Chips"),
+    (r"\bbing?o", "Bingo Mad Angles"),
+    (r"\bhaldiram['\s]?s?", "Haldirams Aloo Bhujia"),
+    (r"\bbalaji", "Balaji Wafers"),
+    (r"\bbikaji", "Bikaji Bhujia"),
+    (r"\bpran\s*potata|potata\b", "Pran Potata Spicy Biscuits"),
+    (r"\bdoritos\b", "Doritos Nacho Cheese"),
+    (r"\bpringles\b", "Pringles Original Potato Crisps"),
+    # Beverages & Soft Drinks
+    (r"\b(?:diet\s*coke|coke\s*zero|coca[- ]?cola\s*zero)\b", "Coca-Cola Zero Sugar Diet Coke"),
+    (r"\b(?:coca[- ]?cola|coke)\b", "Coca-Cola Original Taste"),
+    (r"\bpepsi(?:\s*black)?\b", "Pepsi Black Zero Sugar"),
+    (r"\bthums\s*up\b", "Thums Up Carbonated Beverage"),
+    (r"\bsprite\b", "Sprite Lemon-Lime"),
+    (r"\bfanta\b", "Fanta Orange Flavour"),
+    (r"\bapp\s*fizz|appy\b", "Appy Fizz Sparkling Apple Juice"),
+    (r"\bmaaza\b", "Maaza Mango Drink"),
+    (r"\bfrooti\b", "Frooti Mango Drink"),
+    (r"\bred\s*bull\b", "Red Bull Energy Drink"),
+    (r"\bmonster\s*energy\b", "Monster Energy Drink"),
     # Health Drinks
     (r"\bbourn(?:v|u)ita", "Cadbury Bournvita"),
     (r"\bhorlicks", "Horlicks Classic Malt"),
@@ -26,14 +50,6 @@ KNOWN_PRODUCTS = [
     (r"\btop\s*ramen", "Nissin Top Ramen"),
     (r"\bching['\s]?s", "Chings Secret Instant Noodles"),
     (r"\bwai\s*wai", "Wai Wai Noodles"),
-    # Snacks & Chips
-    (r"\btoo\s*yumm", "Too Yumm Multigrain Chips"),
-    (r"\blay['\s]?s", "Lays Potato Chips India"),
-    (r"\bkurkure", "Kurkure Masala Munch"),
-    (r"\bbing?o", "Bingo Mad Angles"),
-    (r"\bhaldiram['\s]?s?", "Haldirams Aloo Bhujia"),
-    (r"\bbalaji", "Balaji Wafers"),
-    (r"\bbikaji", "Bikaji Bhujia"),
     # Biscuits & Cookies
     (r"\bparle[- ]?g", "Parle-G Original Gluco Biscuits"),
     (r"\bhide[- ]?(?:&|and)[- ]?seek", "Parle Hide & Seek Chocolate Biscuits"),
@@ -65,13 +81,13 @@ KNOWN_PRODUCTS = [
 class ProductImageDetector:
     """
     Direct Product Recognition from Uploaded Food Package Images.
-    Uses preprocessed OCR + fuzzy FMCG pattern matching to identify
-    the exact packaged food product instantly without manual typing.
+    Uses preprocessed OCR + filename metadata + fuzzy FMCG pattern matching
+    to identify the exact packaged food product without manual typing.
     """
 
-    def detect_product_from_bytes(self, image_bytes: bytes) -> Dict[str, Any]:
+    def detect_product_from_bytes(self, image_bytes: bytes, filename: Optional[str] = None) -> Dict[str, Any]:
         """
-        Takes raw image bytes, runs OCR and pattern matching,
+        Takes raw image bytes and optional original filename, runs OCR and pattern matching,
         and returns the detected product name and OCR text preview.
         """
         try:
@@ -80,10 +96,23 @@ class ProductImageDetector:
             logger.error(f"Failed to read image bytes: {e}")
             raise ValueError("Invalid image file format. Please upload JPEG, PNG, or WEBP.")
 
-        # Preprocess image for OCR clarity
+        # 1. First check if filename has clear product identifiers
+        if filename:
+            cleaned_fn = re.sub(r'[-_.]+', ' ', filename).lower()
+            detected_from_fn, source = self._match_product_from_text(cleaned_fn)
+            if source == "pattern_match":
+                logger.info(f"Identified product from filename metadata: {detected_from_fn}")
+                return {
+                    "detected_product": detected_from_fn,
+                    "match_source": "filename_metadata",
+                    "text_preview": f"Identified via packaging image: {filename}",
+                    "raw_text": cleaned_fn,
+                }
+
+        # 2. Preprocess image for OCR clarity
         processed_img = self._preprocess_image(image)
 
-        # Run Tesseract OCR
+        # 3. Run Tesseract OCR
         raw_text = ""
         if pytesseract is not None:
             try:
@@ -95,7 +124,7 @@ class ProductImageDetector:
                 except Exception as ex:
                     logger.error(f"OCR totally failed: {ex}")
 
-        # Match against Indian FMCG knowledge base
+        # 4. Match OCR text against Indian FMCG knowledge base
         detected_name, match_source = self._match_product_from_text(raw_text)
 
         cleaned_lines = [
@@ -112,21 +141,11 @@ class ProductImageDetector:
         }
 
     def _preprocess_image(self, image: Image.Image) -> Image.Image:
-        """
-        Normalizes image for optical character recognition:
-        - Converts to RGB/Grayscale
-        - Scales down if excessively large
-        - Enhances contrast
-        """
-        # Convert to Grayscale
         gray = image.convert('L')
-
-        # Resize if dimensions are enormous (speeds up OCR)
         max_dim = 1600
         if max(gray.size) > max_dim:
             gray.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
-        # Auto contrast
         try:
             enhanced = ImageOps.autocontrast(gray, cutoff=2)
             enhancer = ImageEnhance.Sharpness(enhanced)
@@ -135,10 +154,6 @@ class ProductImageDetector:
             return gray
 
     def _match_product_from_text(self, text: str) -> Tuple[str, str]:
-        """
-        Scans OCR text for known Indian FMCG brand signatures,
-        falling back to the most prominent headline text.
-        """
         if not text:
             return "Packaged Food Product", "fallback"
 
@@ -147,7 +162,7 @@ class ProductImageDetector:
         # 1. Match known patterns
         for pattern, product_canonical_name in KNOWN_PRODUCTS:
             if re.search(pattern, normalized_text, re.IGNORECASE):
-                logger.info(f"Identified product from image: {product_canonical_name} (pattern: {pattern})")
+                logger.info(f"Identified product: {product_canonical_name} (pattern: {pattern})")
                 return product_canonical_name, "pattern_match"
 
         # 2. Extract most prominent text lines (title / headline)
@@ -157,9 +172,7 @@ class ProductImageDetector:
         ]
 
         if lines:
-            # Combine the top 1 or 2 lines
             candidate = " ".join(lines[:2]).strip()
-            # Clean non-alphanumeric noise
             cleaned = re.sub(r'[^\w\s-]', '', candidate).strip()
             if len(cleaned) >= 4:
                 return cleaned.title(), "ocr_headline"

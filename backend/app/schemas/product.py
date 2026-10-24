@@ -5,6 +5,18 @@ from pydantic import BaseModel, Field
 class AuditRequest(BaseModel):
     query: str = Field(..., description="Product name or brand to audit", min_length=2)
     force_refresh: bool = Field(False, description="Bypass cache and force fresh web extraction")
+    profile: Optional[str] = Field("general_health", description="Selected profile: general_health, diabetes_aware, protein_conscious")
+    strict_palm_oil: Optional[bool] = Field(False, description="Strict palm oil avoidance hard exclusion toggle")
+    goals: Optional[List[str]] = Field(default_factory=list, description="User selected nutritional goals: lower_sugar, higher_protein, low_sodium, low_saturated_fat")
+    share_of_daily: Optional[float] = Field(0.15, description="Configurable share of daily allowance per serving (default: 15%)")
+
+
+class PersonalizeRequest(BaseModel):
+    product_data: Dict[str, Any] = Field(..., description="Audited product data dictionary")
+    profile: str = Field("general_health", description="Selected profile: general_health, diabetes_aware, protein_conscious")
+    strict_palm_oil: bool = Field(False, description="Strict palm oil avoidance hard exclusion toggle")
+    goals: List[str] = Field(default_factory=list, description="User selected nutritional goals")
+    share_of_daily: float = Field(0.15, description="Configurable share of daily allowance per serving")
 
 
 class ValueWithSource(BaseModel):
@@ -69,6 +81,8 @@ class ProductAuditData(BaseModel):
     lab_test_coverage: LabTestCoverage = LabTestCoverage()
     summary: str
     claim_integrity_score: int = Field(..., ge=0, le=100)
+    personalized_scoring: Optional[Dict[str, Any]] = None
+    reference_standards: Optional[List[Dict[str, Any]]] = None
 
 
 class AuditResponse(BaseModel):

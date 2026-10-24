@@ -14,10 +14,8 @@ export default function App() {
   const [auditResult, setAuditResult] = useState(null);
   const [evidenceModalOpen, setEvidenceModalOpen] = useState(false);
 
-  // Initial search on mount
-  useEffect(() => {
-    handleSearch('Cadbury Bournvita', false);
-  }, []);
+  // Empty state until user searches or attaches image
+  // (No automatic search on mount)
 
   const handleSearch = async (query, forceRefresh) => {
     setLoading(true);
@@ -83,6 +81,18 @@ export default function App() {
           <div style={{ fontSize: '0.8rem', color: '#888888', marginTop: '6px' }}>
             Cross-referencing packaging claims against actual nutrition facts and ingredient statements
           </div>
+        </div>
+      )}
+
+      {/* Empty State before search */}
+      {!auditResult && !loading && !error && (
+        <div className="content-card" style={{ textAlign: 'center', padding: '60px 20px', border: '1px dashed #2a2a2a' }}>
+          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            No Product Selected
+          </div>
+          <p style={{ fontSize: '0.82rem', color: '#737373', marginTop: '6px', maxWidth: '440px', margin: '6px auto 0 auto' }}>
+            Search for an Indian packaged food item or select a suggestion above to audit front-of-pack claims and personalized suitability.
+          </p>
         </div>
       )}
 

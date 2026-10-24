@@ -81,11 +81,35 @@ async def init_db():
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency for obtaining database sessions."""
+    """Dependency for obtaining database sessions with automatic resilience."""
+    global _engine, _sessionmaker
     sm = get_sessionmaker()
-    async with sm() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+    try:
+        async with sm() as session:
+            try:
+                # Quick probe to ensure connection is live
+                yield session
+            except Exception as e:
+                # If connection refused (e.g. PostgreSQL down), switch to fallback immediately
+                err_msg = str(e)
+                if "connection refused" in err_msg.lower() or "connect call failed" in err_msg.lower():
+                    logger.warning(f"Active session connection failed ({e}). Switching engine to local SQLite fallback.")
+                    _engine = create_async_engine(
+                        settings.FALLBACK_DATABASE_URL,
+                        echo=False,
+                        future=True,
+                    )
+                    _sessionmaker = async_sessionmaker(
+                        bind=_engine,
+                        class_=AsyncSession,
+                        expire_on_commit=False,
+                    )
+                    async with _engine.begin() as conn:
+                        await conn.run_sync(Base.metadata.create_all)
+                    async with _sessionmaker() as fallback_session:
+                        yield fallback_session
+                else:
+                    raise
+    finally:
+        pass
 
