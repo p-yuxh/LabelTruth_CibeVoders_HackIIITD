@@ -20,32 +20,39 @@ export default function App() {
   const handleSearch = async (query, forceRefresh) => {
     setLoading(true);
     setError(null);
-    setLoadingStep('Locating product records...');
+    setLoadingStep('Locating product records in evidence registry...');
+
+    const timers = [
+      setTimeout(() => {
+        if (!forceRefresh) setLoadingStep('Retrieving verified product data from evidence log...');
+        else setLoadingStep('Querying live Indian retail and brand sources...');
+      }, 400),
+      setTimeout(() => {
+        setLoadingStep('Extracting nutritional table and ingredients statement...');
+      }, 1200),
+      setTimeout(() => {
+        setLoadingStep('Verifying marketing claims against statutory guidelines (FSSAI & ICMR-NIN)...');
+      }, 2500),
+      setTimeout(() => {
+        setLoadingStep('Evaluating statutory condition limits & flagged ingredient risks...');
+      }, 4500),
+      setTimeout(() => {
+        setLoadingStep('Computing Personalised Rating & searching healthier category alternatives...');
+      }, 7500),
+      setTimeout(() => {
+        setLoadingStep('Awaiting final disclosures from live scraping agent...');
+      }, 12000),
+    ];
 
     try {
-      const t1 = setTimeout(() => {
-        if (!forceRefresh) setLoadingStep('Retrieving verified product data...');
-        else setLoadingStep('Gathering label disclosures from live brand sources...');
-      }, 300);
-
-      const t2 = setTimeout(() => {
-        setLoadingStep('Extracting nutritional table and ingredients statement...');
-      }, 700);
-
-      const t3 = setTimeout(() => {
-        setLoadingStep('Verifying marketing claims against nutrient thresholds...');
-      }, 1200);
-
       const res = await auditProduct(query, forceRefresh);
-      
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-
+      timers.forEach(clearTimeout);
       setAuditResult(res);
     } catch (err) {
+      timers.forEach(clearTimeout);
       setError(err.message || 'An error occurred while auditing the product.');
     } finally {
+      timers.forEach(clearTimeout);
       setLoading(false);
       setLoadingStep('');
     }

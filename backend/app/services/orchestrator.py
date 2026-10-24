@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
@@ -102,8 +103,8 @@ class AuditOrchestrator:
 
         logger.info(f"CACHE MISS for '{cleaned_query}'. Launching TinyFish web scraper & Claims Auditor.")
 
-        # Step 2: Sequential Scraping Layer via TinyFish API
-        tinyfish_result = self.scraper.run_full_pipeline(cleaned_query)
+        # Step 2: Non-blocking Scraping Layer via TinyFish API
+        tinyfish_result = await asyncio.to_thread(self.scraper.run_full_pipeline, cleaned_query)
 
         # Step 3: Data Normalization & Claims Audit Layer
         normalized_data = self.auditor.normalize_and_audit(

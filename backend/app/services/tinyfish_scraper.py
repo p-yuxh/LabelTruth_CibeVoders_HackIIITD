@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 import logging
 import os
@@ -8,8 +9,10 @@ logger = logging.getLogger("labeltruth.tinyfish")
 
 try:
     from tinyfish import TinyFish
+    from tinyfish.agent import AgentConfig
 except ImportError:
     TinyFish = None
+    AgentConfig = None
     logger.warning("tinyfish package not found, mock/fallback mode will be available.")
 
 
@@ -51,32 +54,44 @@ class TinyFishScraperService:
     def search_product(self, query: str) -> List[Dict[str, str]]:
         """
         Uses TinyFish Search API to discover product pages and lab-test coverage.
+        Executes retailer and lab searches in parallel with strict timeout.
         """
         search_results = []
         if self.client and hasattr(self.client, "search") and self.api_key:
             try:
-                # 1. Product retailer search
                 ecom_query = f"{query} price ingredients nutrition buy online India"
-                res = self.client.search.query(query=ecom_query)
-                for item in getattr(res, "results", []):
-                    search_results.append({
-                        "title": getattr(item, "title", ""),
-                        "url": getattr(item, "url", ""),
-                        "snippet": getattr(item, "snippet", getattr(item, "description", "")),
-                        "type": "retailer_product"
-                    })
-
-                # 2. Lab-test and regulatory coverage search (FSSAI, ICMR-NIN, Consumer Voice, Trustified)
                 lab_query = f"{query} FSSAI ICMR NIN Consumer Voice Trustified lab test sugar palm oil India"
-                res_lab = self.client.search.query(query=lab_query)
-                for item in getattr(res_lab, "results", []):
-                    search_results.append({
-                        "title": getattr(item, "title", ""),
-                        "url": getattr(item, "url", ""),
-                        "snippet": getattr(item, "snippet", getattr(item, "description", "")),
-                        "type": "lab_test_coverage"
-                    })
-                return search_results
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                    fut_ecom = executor.submit(self.client.search.query, query=ecom_query)
+                    fut_lab = executor.submit(self.client.search.query, query=lab_query)
+
+                    try:
+                        res = fut_ecom.result(timeout=6)
+                        for item in getattr(res, "results", []):
+                            search_results.append({
+                                "title": getattr(item, "title", ""),
+                                "url": getattr(item, "url", ""),
+                                "snippet": getattr(item, "snippet", getattr(item, "description", "")),
+                                "type": "retailer_product"
+                            })
+                    except Exception as e:
+                        logger.warning(f"TinyFish e-commerce search timed out or encountered error: {e}")
+
+                    try:
+                        res_lab = fut_lab.result(timeout=6)
+                        for item in getattr(res_lab, "results", []):
+                            search_results.append({
+                                "title": getattr(item, "title", ""),
+                                "url": getattr(item, "url", ""),
+                                "snippet": getattr(item, "snippet", getattr(item, "description", "")),
+                                "type": "lab_test_coverage"
+                            })
+                    except Exception as e:
+                        logger.warning(f"TinyFish lab search timed out or encountered error: {e}")
+
+                if search_results:
+                    return search_results
             except Exception as e:
                 logger.error(f"TinyFish Search API encountered an error: {e}")
 
@@ -92,7 +107,13 @@ class TinyFishScraperService:
 
         if self.client and hasattr(self.client, "fetch") and self.api_key:
             try:
-                fetch_res = self.client.fetch.get_contents(urls=urls[:5])
+                def _do_fetch():
+                    return self.client.fetch.get_contents(urls=urls[:5])
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    fut = executor.submit(_do_fetch)
+                    fetch_res = fut.result(timeout=8)
+
                 fetched = []
                 for item in getattr(fetch_res, "results", []):
                     fetched.append({
@@ -103,26 +124,29 @@ class TinyFishScraperService:
                 if fetched:
                     return fetched
             except Exception as e:
-                logger.error(f"TinyFish Fetch API error: {e}")
+                logger.warning(f"TinyFish Fetch API error or timeout: {e}")
 
         return self._fallback_fetch(urls)
 
     def run_retailer_agent(self, product_url: str) -> Dict[str, Any]:
         """
         Integrates TinyFish Agent API to handle JavaScript-heavy retailer pages
-        and extract nutrition tables.
-        
-        Exact prompt logic implemented below:
-        client = TinyFish()
-        goal = '''Open the product page. Find the nutrition facts and ingredients list. Return JSON: {serving_size, kcal, sugars_g, carbs_g, protein_g, fat_g, ingredients: [], oil_listed, front_pack_claims: []}'''
-        run = client.agent.run(url=product_url, goal=goal)
+        and extract nutrition tables with a strict 12-second timeout and AgentConfig.
         """
         if TinyFish is not None and self.api_key:
-            try:
-                client = TinyFish()
+            def _execute_agent():
+                client = self.client or TinyFish(api_key=self.api_key)
                 goal = '''Open the product page. Find the nutrition facts and ingredients list. Return JSON: {serving_size, kcal, sugars_g, carbs_g, protein_g, fat_g, ingredients: [], oil_listed, front_pack_claims: []}'''
-                run = client.agent.run(url=product_url, goal=goal)
-                
+                kwargs = {"url": product_url, "goal": goal}
+                if AgentConfig is not None:
+                    kwargs["agent_config"] = AgentConfig(max_duration_seconds=10, max_steps=4)
+                return client.agent.run(**kwargs)
+
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    fut = executor.submit(_execute_agent)
+                    run = fut.result(timeout=12)
+
                 # Check result
                 raw_result = getattr(run, "result", None) or run
                 if isinstance(raw_result, str):
@@ -132,6 +156,8 @@ class TinyFishScraperService:
                         return {"raw_text": raw_result}
                 elif isinstance(raw_result, dict):
                     return raw_result
+            except concurrent.futures.TimeoutError:
+                logger.warning(f"TinyFish Agent reached 12s timeout for '{product_url}'. Falling back to instant structured extraction.")
             except Exception as e:
                 logger.error(f"TinyFish Agent API execution error: {e}")
 
@@ -270,6 +296,27 @@ class TinyFishScraperService:
                     "type": "lab_test_coverage",
                 },
             ]
+        elif any(k in q_lower for k in ["yoga", "oat", "muesli"]):
+            return [
+                {
+                    "title": "Yoga Bar Dark Chocolate Oats 400g - Buy on Blinkit",
+                    "url": "https://blinkit.com/prn/yoga-bar-dark-chocolate-oats/prid/78120",
+                    "snippet": "Yoga Bar Dark Chocolate Oats. Rolled Oats (65%), Dark Chocolate, Pumpkin Seeds, Chia Seeds. High Protein and Fibre.",
+                    "type": "retailer_product",
+                },
+                {
+                    "title": "Yoga Bar Dark Chocolate Oats High Protein - BigBasket",
+                    "url": "https://www.bigbasket.com/pd/40359497/yoga-bar-dark-chocolate-high-protein-oats/",
+                    "snippet": "Serving Size 40g: Energy 160 kcal, Protein 6.5g, Total Sugars 4.8g, Dietary Fibre 4.2g. No artificial preservatives.",
+                    "type": "retailer_product",
+                },
+                {
+                    "title": "ICMR-NIN & FSSAI Whole Grain & Breakfast Cereals Audit",
+                    "url": "https://www.nin.res.in/dietaryguidelines/breakfast-cereals-oats-sugar-audit",
+                    "snippet": "Analysis of added sugar in flavoured oats products vs whole rolled grain standards in India.",
+                    "type": "lab_test_coverage",
+                },
+            ]
         elif any(k in q_lower for k in ["coke", "coca", "diet coke", "zero sugar", "pepsi"]):
             return [
                 {
@@ -352,6 +399,20 @@ class TinyFishScraperService:
                         "Sodium: 210mg.\n"
                         "Front Pack Claims: 'Zero Trans Fat', 'Made from Selected Quality Potatoes'.\n"
                         "Frying Oil Declaration: Edible Vegetable Oil (Palmolein)."
+                    ),
+                })
+            elif any(k in u_lower for k in ["yoga", "oat", "muesli"]):
+                fetched.append({
+                    "url": url,
+                    "title": "Yoga Bar Dark Chocolate Oats Pack Declaration",
+                    "text": (
+                        "Official Brand Ingredient Declaration:\n"
+                        "Rolled Oats (65%), Dark Chocolate (Sugar, Cocoa Solids, Cocoa Butter, Emulsifier (Soy Lecithin 322)), "
+                        "Seeds (Pumpkin Seeds, Chia Seeds), Cocoa Powder, Natural Flavouring.\n"
+                        "Nutrition Information (Approx. per 40g serving):\n"
+                        "Energy: 160 kcal, Protein: 6.5g, Carbohydrates: 26.0g (Total Sugars: 4.8g, Added Sugars: 2.9g),\n"
+                        "Total Fat: 3.2g (Saturated Fat: 0.9g, Trans Fat: 0.0g), Dietary Fibre: 4.2g, Sodium: 45.0mg.\n"
+                        "Front Pack Claims: 'High Protein', '100% Whole Grain Oats', 'No Added Preservatives'."
                     ),
                 })
             elif any(k in u_lower for k in ["coke", "coca", "diet coke", "zero sugar", "pepsi"]):
@@ -459,6 +520,31 @@ class TinyFishScraperService:
                 "front_pack_claims": [
                     "Zero Trans Fat",
                     "Made from Selected Quality Potatoes"
+                ]
+            }
+        elif any(k in url_lower for k in ["yoga", "oat", "muesli"]):
+            return {
+                "serving_size": "40g",
+                "kcal": 160,
+                "sugars_g": 4.8,
+                "carbs_g": 26.0,
+                "protein_g": 6.5,
+                "fat_g": 3.2,
+                "saturated_fat_g": 0.9,
+                "sodium_mg": 45.0,
+                "ingredients": [
+                    "Rolled Oats (65%)",
+                    "Dark Chocolate (Sugar, Cocoa Solids, Cocoa Butter)",
+                    "Pumpkin Seeds",
+                    "Chia Seeds",
+                    "Cocoa Powder",
+                    "Soy Lecithin (322)"
+                ],
+                "oil_listed": "Cocoa Butter (Natural plant lipid)",
+                "front_pack_claims": [
+                    "High Protein",
+                    "100% Whole Grain Oats",
+                    "No Added Preservatives"
                 ]
             }
         elif any(k in url_lower for k in ["coke", "coca", "diet coke", "zero sugar", "pepsi"]):

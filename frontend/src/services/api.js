@@ -1,6 +1,9 @@
 const API_BASE = '/api';
 
 export async function auditProduct(query, forceRefresh = false, profile = 'general_health', shareOfDaily = 0.15) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
   try {
     const response = await fetch(`${API_BASE}/audit`, {
       method: 'POST',
@@ -13,6 +16,7 @@ export async function auditProduct(query, forceRefresh = false, profile = 'gener
         profile,
         share_of_daily: shareOfDaily,
       }),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -22,14 +26,22 @@ export async function auditProduct(query, forceRefresh = false, profile = 'gener
 
     return await response.json();
   } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Audit request timed out after 30 seconds. Please retry or check connection.');
+    }
     if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
       throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000 (uvicorn app.main:app --app-dir backend --port 8000).');
     }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
 export async function auditWithImage(imageFile, forceRefresh = false) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 35000);
+
   try {
     const formData = new FormData();
     formData.append('file', imageFile);
@@ -38,6 +50,7 @@ export async function auditWithImage(imageFile, forceRefresh = false) {
     const response = await fetch(`${API_BASE}/audit-image`, {
       method: 'POST',
       body: formData,
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -47,14 +60,22 @@ export async function auditWithImage(imageFile, forceRefresh = false) {
 
     return await response.json();
   } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Image audit timed out after 35 seconds. Please retry.');
+    }
     if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
       throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000.');
     }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
 export async function detectProductFromImage(imageFile) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+
   try {
     const formData = new FormData();
     formData.append('file', imageFile);
@@ -62,6 +83,7 @@ export async function detectProductFromImage(imageFile) {
     const response = await fetch(`${API_BASE}/detect-image`, {
       method: 'POST',
       body: formData,
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -71,25 +93,40 @@ export async function detectProductFromImage(imageFile) {
 
     return await response.json();
   } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Image detection timed out after 20 seconds.');
+    }
     if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
       throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000.');
     }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
 export async function fetchEvidenceLogs(limit = 30, offset = 0) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
   try {
-    const response = await fetch(`${API_BASE}/evidence-logs?limit=${limit}&offset=${offset}`);
+    const response = await fetch(`${API_BASE}/evidence-logs?limit=${limit}&offset=${offset}`, {
+      signal: controller.signal,
+    });
     if (!response.ok) {
       throw new Error('Failed to retrieve evidence logs');
     }
     return await response.json();
   } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Retrieving evidence logs timed out.');
+    }
     if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
       throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000.');
     }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
