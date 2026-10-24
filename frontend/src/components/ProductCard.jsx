@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, AlertTriangle, CheckCircle, ShieldAlert, FlaskConical, Award, Tag } from 'lucide-react';
+import { ExternalLink, AlertTriangle, CheckCircle, ShieldAlert, FileText } from 'lucide-react';
 
 export default function ProductCard({ data }) {
   if (!data) return null;
@@ -19,12 +19,6 @@ export default function ProductCard({ data }) {
 
   const isPalmOil = oil_listed?.is_palm_oil || false;
 
-  const getScoreClass = (score) => {
-    if (score >= 70) return 'high';
-    if (score >= 45) return 'mid';
-    return 'low';
-  };
-
   const getVerdictClass = (verdict) => {
     const v = (verdict || '').toLowerCase();
     if (v.includes('contradicted') || v.includes('misleading')) return 'contradicted';
@@ -35,7 +29,7 @@ export default function ProductCard({ data }) {
   return (
     <div className="desktop-grid">
       {/* =========================================
-          LEFT COLUMN: Product Dossier & Nutrition
+          LEFT COLUMN: Product Overview & Nutrition
          ========================================= */}
       <div className="content-card">
         {/* Product Hero Header */}
@@ -43,7 +37,7 @@ export default function ProductCard({ data }) {
           <div className="product-meta">
             <h2>{product_name?.value || 'Audited Product'}</h2>
             <div className="product-brand">
-              <strong>Brand:</strong> {brand?.value} {category?.value ? `• ${category?.value}` : ''}
+              {brand?.value} {category?.value ? `• ${category?.value}` : ''}
             </div>
             {product_name?.source_url && (
               <a
@@ -51,35 +45,35 @@ export default function ProductCard({ data }) {
                 target="_blank"
                 rel="noreferrer"
                 className="citation-link"
-                style={{ marginTop: '6px' }}
+                style={{ marginTop: '8px' }}
               >
                 <ExternalLink size={13} />
-                <span>Verified Retailer Source URL</span>
+                <span>View Product Listing</span>
               </a>
             )}
           </div>
 
-          {/* Claim Integrity Score Dial */}
-          <div className={`score-badge-circle ${getScoreClass(claim_integrity_score)}`}>
+          {/* Square Score Block */}
+          <div className="score-badge-box">
             <span className="score-number">{claim_integrity_score}</span>
-            <span className="score-label">Integrity</span>
+            <span className="score-label">Truth Score</span>
           </div>
         </div>
 
-        {/* Palm Oil & Edible Fat Warning Callout */}
-        <div className={`warning-callout ${isPalmOil ? 'danger' : 'safe'}`}>
+        {/* Palm Oil & Cooking Fat Callout */}
+        <div className={`warning-callout ${isPalmOil ? 'alert' : ''}`}>
           {isPalmOil ? (
             <>
-              <ShieldAlert size={24} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <ShieldAlert size={22} style={{ flexShrink: 0, marginTop: '2px', color: '#ffffff' }} />
               <div>
-                <strong style={{ fontSize: '0.95rem' }}>Palm Oil Warning: </strong>
-                <span>
-                  {oil_listed?.value || 'Palm oil / Palmolein'} detected. Contributes higher saturated fatty acids and lower lipid quality.
+                <strong style={{ fontSize: '0.92rem', color: '#ffffff' }}>Palm Oil Detected: </strong>
+                <span style={{ color: '#d4d4d4' }}>
+                  {oil_listed?.value || 'Palm oil / Palmolein'} is listed as the cooking oil. Palm oil carries higher saturated fats.
                 </span>
                 {oil_listed?.source_url && (
-                  <div style={{ marginTop: '4px' }}>
+                  <div style={{ marginTop: '6px' }}>
                     <a href={oil_listed.source_url} target="_blank" rel="noreferrer" className="citation-link">
-                      <ExternalLink size={12} /> Cited from ingredient disclosure
+                      <ExternalLink size={11} /> View Ingredients Statement
                     </a>
                   </div>
                 )}
@@ -87,14 +81,14 @@ export default function ProductCard({ data }) {
             </>
           ) : (
             <>
-              <CheckCircle size={24} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <CheckCircle size={22} style={{ flexShrink: 0, marginTop: '2px', color: '#ffffff' }} />
               <div>
-                <strong style={{ fontSize: '0.95rem' }}>Edible Oil Profile: </strong>
-                <span>{oil_listed?.value || 'No palm oil detected.'}</span>
+                <strong style={{ fontSize: '0.92rem', color: '#ffffff' }}>Oil Declaration: </strong>
+                <span style={{ color: '#d4d4d4' }}>{oil_listed?.value || 'No palm oil detected.'}</span>
                 {oil_listed?.source_url && (
-                  <div style={{ marginTop: '4px' }}>
+                  <div style={{ marginTop: '6px' }}>
                     <a href={oil_listed.source_url} target="_blank" rel="noreferrer" className="citation-link">
-                      <ExternalLink size={12} /> Cited from ingredients statement
+                      <ExternalLink size={11} /> View Ingredients Statement
                     </a>
                   </div>
                 )}
@@ -105,8 +99,9 @@ export default function ProductCard({ data }) {
 
         {/* Audit Summary Box */}
         {summary && (
-          <div style={{ fontSize: '0.9rem', color: '#e2e8f0', background: 'rgba(255,255,255,0.03)', padding: '14px 18px', borderRadius: '10px', borderLeft: '4px solid #10b981' }}>
-            <strong style={{ color: '#10b981' }}>Claims Audit Summary: </strong> {summary}
+          <div style={{ fontSize: '0.9rem', color: '#e5e5e5', background: '#000000', padding: '16px', border: '1px solid #2a2a2a', borderLeft: '4px solid #ffffff' }}>
+            <strong style={{ color: '#ffffff', textTransform: 'uppercase', fontSize: '0.8rem', letterSpacing: '0.04em' }}>Audit Summary: </strong>
+            <p style={{ marginTop: '4px', lineHeight: 1.5, color: '#cccccc' }}>{summary}</p>
           </div>
         )}
 
@@ -114,12 +109,12 @@ export default function ProductCard({ data }) {
         {nutrition && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#a3a3a3' }}>
                 Nutrition Facts ({nutrition.serving_size?.value || 'Per Serving'})
               </h3>
               {nutrition.serving_size?.source_url && (
                 <a href={nutrition.serving_size.source_url} target="_blank" rel="noreferrer" className="citation-link">
-                  <ExternalLink size={13} /> Serving Source
+                  <ExternalLink size={12} /> Serving Source
                 </a>
               )}
             </div>
@@ -128,7 +123,7 @@ export default function ProductCard({ data }) {
               {nutrition.kcal && (
                 <div className="nutri-box">
                   <span className="nutri-label">Calories</span>
-                  <span className="nutri-val">{nutrition.kcal.value} <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>{nutrition.kcal.unit}</span></span>
+                  <span className="nutri-val">{nutrition.kcal.value} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#a3a3a3' }}>{nutrition.kcal.unit}</span></span>
                   <a href={nutrition.kcal.source_url} target="_blank" rel="noreferrer" className="nutri-source">
                     <ExternalLink size={10} /> source
                   </a>
@@ -146,13 +141,9 @@ export default function ProductCard({ data }) {
               )}
 
               {nutrition.sugars_g && (
-                <div className="nutri-box" style={{ borderColor: nutrition.sugars_g.value > 5 ? 'rgba(245, 158, 11, 0.45)' : undefined }}>
-                  <span className="nutri-label" style={{ color: nutrition.sugars_g.value > 5 ? '#f59e0b' : undefined }}>
-                    Total Sugars
-                  </span>
-                  <span className="nutri-val" style={{ color: nutrition.sugars_g.value > 5 ? '#f59e0b' : undefined }}>
-                    {nutrition.sugars_g.value}g
-                  </span>
+                <div className={`nutri-box ${nutrition.sugars_g.value > 5 ? 'flagged' : ''}`}>
+                  <span className="nutri-label">Total Sugars</span>
+                  <span className="nutri-val">{nutrition.sugars_g.value}g</span>
                   <a href={nutrition.sugars_g.source_url} target="_blank" rel="noreferrer" className="nutri-source">
                     <ExternalLink size={10} /> source
                   </a>
@@ -160,13 +151,9 @@ export default function ProductCard({ data }) {
               )}
 
               {nutrition.added_sugars_g && (
-                <div className="nutri-box" style={{ borderColor: nutrition.added_sugars_g.value > 3 ? 'rgba(244, 63, 94, 0.45)' : undefined }}>
-                  <span className="nutri-label" style={{ color: nutrition.added_sugars_g.value > 3 ? '#f43f5e' : undefined }}>
-                    Added Sugars
-                  </span>
-                  <span className="nutri-val" style={{ color: nutrition.added_sugars_g.value > 3 ? '#f43f5e' : undefined }}>
-                    {nutrition.added_sugars_g.value}g
-                  </span>
+                <div className={`nutri-box ${nutrition.added_sugars_g.value > 3 ? 'flagged' : ''}`}>
+                  <span className="nutri-label">Added Sugars</span>
+                  <span className="nutri-val">{nutrition.added_sugars_g.value}g</span>
                   <a href={nutrition.added_sugars_g.source_url} target="_blank" rel="noreferrer" className="nutri-source">
                     <ExternalLink size={10} /> source
                   </a>
@@ -204,11 +191,9 @@ export default function ProductCard({ data }) {
               )}
 
               {nutrition.sodium_mg && (
-                <div className="nutri-box" style={{ borderColor: nutrition.sodium_mg.value > 500 ? 'rgba(244, 63, 94, 0.45)' : undefined }}>
+                <div className={`nutri-box ${nutrition.sodium_mg.value > 500 ? 'flagged' : ''}`}>
                   <span className="nutri-label">Sodium</span>
-                  <span className="nutri-val" style={{ color: nutrition.sodium_mg.value > 500 ? '#f43f5e' : undefined }}>
-                    {nutrition.sodium_mg.value}mg
-                  </span>
+                  <span className="nutri-val">{nutrition.sodium_mg.value}mg</span>
                   <a href={nutrition.sodium_mg.source_url} target="_blank" rel="noreferrer" className="nutri-source">
                     <ExternalLink size={10} /> source
                   </a>
@@ -220,16 +205,16 @@ export default function ProductCard({ data }) {
       </div>
 
       {/* =========================================
-          RIGHT COLUMN: Claims Audit & Ingredients
+          RIGHT COLUMN: Claims Verification & Ingredients
          ========================================= */}
       <div className="content-card">
         {/* Front Pack Claims Audit */}
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>
-              Front-Of-Pack Marketing Claims ({front_pack_claims.length})
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#a3a3a3' }}>
+              Claims Verification ({front_pack_claims.length})
             </h3>
-            <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Audited against FSSAI Guidelines</span>
+            <span style={{ fontSize: '0.75rem', color: '#666666', textTransform: 'uppercase' }}>Cross-Referenced Against Label</span>
           </div>
 
           <div className="claims-list">
@@ -244,7 +229,7 @@ export default function ProductCard({ data }) {
                 <div className="claim-reason">{item.verdict_reason}</div>
                 {item.source_url && (
                   <a href={item.source_url} target="_blank" rel="noreferrer" className="citation-link">
-                    <ExternalLink size={12} /> Claim Source Citation
+                    <ExternalLink size={11} /> Cited from claim source
                   </a>
                 )}
               </div>
@@ -256,13 +241,13 @@ export default function ProductCard({ data }) {
         {ingredients.length > 0 && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>
-                Ingredients & Additives ({ingredients.length})
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#a3a3a3' }}>
+                Ingredients ({ingredients.length})
               </h3>
-              <div style={{ display: 'flex', gap: '8px', fontSize: '0.72rem' }}>
-                <span style={{ color: '#fca5a5' }}>● Palm</span>
-                <span style={{ color: '#fcd34d' }}>● Allergen</span>
-                <span style={{ color: '#a5b4fc' }}>● Additive</span>
+              <div style={{ display: 'flex', gap: '10px', fontSize: '0.72rem', color: '#a3a3a3' }}>
+                <span>[■ Palm Oil]</span>
+                <span>[□ Allergen]</span>
+                <span>[· Additive]</span>
               </div>
             </div>
 
@@ -276,12 +261,12 @@ export default function ProductCard({ data }) {
                 return (
                   <div key={idx} className={`ingredient-badge ${badgeType}`}>
                     <span>{ing.name}</span>
-                    {ing.is_palm_oil_or_derivative && <span style={{ fontSize: '0.7rem', color: '#fca5a5' }}>(Palm)</span>}
-                    {ing.is_allergen && <span style={{ fontSize: '0.7rem', color: '#fcd34d' }}>(Allergen)</span>}
-                    {ing.is_additive && <span style={{ fontSize: '0.7rem', color: '#a5b4fc' }}>(Additive)</span>}
+                    {ing.is_palm_oil_or_derivative && <span style={{ fontSize: '0.7rem' }}>[PALM]</span>}
+                    {ing.is_allergen && <span style={{ fontSize: '0.7rem' }}>[ALLERGEN]</span>}
+                    {ing.is_additive && <span style={{ fontSize: '0.7rem' }}>[ADDITIVE]</span>}
                     {ing.source_url && (
                       <a href={ing.source_url} target="_blank" rel="noreferrer" style={{ color: 'inherit', opacity: 0.6 }} title="View source citation">
-                        <ExternalLink size={11} />
+                        <ExternalLink size={10} />
                       </a>
                     )}
                   </div>
@@ -291,20 +276,20 @@ export default function ProductCard({ data }) {
           </div>
         )}
 
-        {/* Consumer Lab Test Coverage */}
+        {/* Consumer Lab & Regulatory Reports */}
         {lab_test_coverage && (
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#38bdf8', marginBottom: '6px' }}>
-              <FlaskConical size={18} />
-              <strong style={{ fontSize: '0.92rem' }}>Consumer Lab & Regulatory Testing Coverage</strong>
+          <div style={{ background: '#000000', border: '1px solid #2a2a2a', padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ffffff', marginBottom: '6px' }}>
+              <FileText size={16} />
+              <strong style={{ fontSize: '0.88rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Independent Lab & Regulatory Coverage</strong>
             </div>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.5 }}>
-              {lab_test_coverage.summary || 'No adverse regulatory orders found in the national testing repository.'}
+            <p style={{ fontSize: '0.85rem', color: '#a3a3a3', lineHeight: 1.5 }}>
+              {lab_test_coverage.summary || 'No adverse regulatory test findings on record.'}
             </p>
             {lab_test_coverage.source_url && (
-              <div style={{ marginTop: '6px' }}>
+              <div style={{ marginTop: '8px' }}>
                 <a href={lab_test_coverage.source_url} target="_blank" rel="noreferrer" className="citation-link">
-                  <ExternalLink size={12} /> Consumer Voice / FSSAI Reference
+                  <ExternalLink size={12} /> View Reference Report
                 </a>
               </div>
             )}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Database, Clock, ExternalLink, RefreshCw, ArrowRight } from 'lucide-react';
+import { X, Clock, RefreshCw, ArrowRight, History } from 'lucide-react';
 import { fetchEvidenceLogs } from '../services/api';
 
 export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
@@ -14,7 +14,7 @@ export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
       const data = await fetchEvidenceLogs(30, 0);
       setLogs(data);
     } catch (err) {
-      setError(err.message || 'Failed to fetch evidence logs');
+      setError(err.message || 'Failed to fetch audit history');
     } finally {
       setLoading(false);
     }
@@ -32,18 +32,20 @@ export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Database size={20} color="#10b981" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <History size={20} color="#ffffff" />
             <div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>PostgreSQL Evidence Logs Cache</h3>
-              <p style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                Cached audit records stored in table <code>evidence_logs</code> for instantaneous resolution.
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Audit History
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: '#a3a3a3' }}>
+                Previously analyzed food products and verified claims.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+            style={{ background: 'transparent', border: 'none', color: '#ffffff', cursor: 'pointer' }}
           >
             <X size={22} />
           </button>
@@ -51,29 +53,29 @@ export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
 
         <div className="modal-body">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <span style={{ fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 600 }}>
-              {logs.length} Cached Product Entries Found
+            <span style={{ fontSize: '0.8rem', color: '#a3a3a3', fontWeight: 600, textTransform: 'uppercase' }}>
+              {logs.length} Audited Products
             </span>
             <button
               onClick={loadLogs}
               className="btn-icon"
-              style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+              style={{ padding: '6px 12px', fontSize: '0.75rem' }}
               disabled={loading}
             >
-              <RefreshCw size={14} className={loading ? 'spinner' : ''} />
-              <span>Refresh Cache</span>
+              <RefreshCw size={12} className={loading ? 'spinner' : ''} />
+              <span>Refresh</span>
             </button>
           </div>
 
           {error && (
-            <div style={{ color: '#f43f5e', fontSize: '0.85rem', padding: '10px 14px', background: 'rgba(244,63,94,0.1)', borderRadius: '8px' }}>
+            <div style={{ color: '#ffffff', fontSize: '0.85rem', padding: '10px 14px', background: '#1c1c1c', border: '1px solid #ffffff' }}>
               {error}
             </div>
           )}
 
           {logs.length === 0 && !loading && (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.9rem' }}>
-              No evidence logs cached in PostgreSQL yet. Run an audit from the search bar to populate the cache!
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#666666', fontSize: '0.9rem' }}>
+              No previous audits found. Search for a product to begin auditing.
             </div>
           )}
 
@@ -86,31 +88,26 @@ export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
                 onClose();
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <span className="badge-pill hit" style={{ fontSize: '0.7rem' }}>
-                  #{log.id}
-                </span>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f8fafc' }}>
-                    {log.product_name || log.query}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
-                    <span>Search query: "{log.query}"</span>
-                    <span>•</span>
-                    <span>{log.brand || 'Indian Brand'}</span>
-                    <span>•</span>
-                    <span>{log.source_urls?.length || 0} crawled sources</span>
-                  </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff' }}>
+                  {log.product_name || log.query}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#888888', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '3px' }}>
+                  <span>Query: "{log.query}"</span>
+                  <span>•</span>
+                  <span>{log.brand || 'Brand'}</span>
+                  <span>•</span>
+                  <span>{log.source_urls?.length || 0} Sources</span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#666666', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Clock size={12} />
-                  {new Date(log.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                  {new Date(log.created_at).toLocaleDateString()}
                 </span>
-                <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600 }}>
-                  View Dossier <ArrowRight size={14} />
+                <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                  View <ArrowRight size={13} />
                 </span>
               </div>
             </div>

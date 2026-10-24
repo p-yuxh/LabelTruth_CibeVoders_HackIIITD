@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Database, Globe, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Globe2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 
 export default function CacheStatusBanner({ result }) {
   const [showSources, setShowSources] = useState(false);
@@ -7,25 +7,25 @@ export default function CacheStatusBanner({ result }) {
   const sources = result.source_urls || [];
 
   return (
-    <div className={`cache-banner ${isCached ? 'hit' : 'miss'}`}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {isCached ? <Database size={16} /> : <Globe size={16} />}
-        <span>
+    <div className="cache-banner">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {isCached ? <CheckCircle2 size={16} color="#ffffff" /> : <Globe2 size={16} color="#ffffff" />}
+        <span style={{ fontSize: '0.86rem', color: '#ffffff' }}>
           {isCached ? (
             <>
-              <strong>PostgreSQL Cache Hit</strong> (Log #{result.evidence_log_id})
+              <strong>Verified Product Record</strong> (Instant verification from audit history)
             </>
           ) : (
             <>
-              <strong>TinyFish + Claude Live Pipeline</strong> (Saved as Log #{result.evidence_log_id})
+              <strong>Live Verified Audit</strong> (Freshly analyzed from brand and retailer sources)
             </>
           )}
         </span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span className={`badge-pill ${isCached ? 'hit' : 'miss'}`}>
-          {isCached ? 'CACHED' : 'FRESH EXTRACT'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span className="badge-pill">
+          {isCached ? 'VERIFIED RECORD' : 'LIVE AUDIT'}
         </span>
         
         {sources.length > 0 && (
@@ -34,25 +34,28 @@ export default function CacheStatusBanner({ result }) {
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'inherit',
+              color: '#a3a3a3',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              fontSize: '0.75rem',
-              gap: '2px',
-              fontWeight: 600
+              fontSize: '0.8rem',
+              gap: '4px',
+              fontWeight: 600,
+              textDecoration: 'underline'
             }}
           >
-            {sources.length} sources
+            {sources.length} Verified Sources
             {showSources ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         )}
       </div>
 
       {showSources && (
-        <div style={{ width: '100%', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginBottom: '4px' }}>CRAWLED SOURCES:</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ width: '100%', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #2a2a2a' }}>
+          <div style={{ fontSize: '0.74rem', color: '#737373', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+            Primary Evidence Sources:
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
             {sources.map((url, idx) => (
               <a
                 key={idx}
@@ -60,12 +63,12 @@ export default function CacheStatusBanner({ result }) {
                 target="_blank"
                 rel="noreferrer"
                 style={{
-                  color: 'inherit',
+                  color: '#ffffff',
                   textDecoration: 'underline',
-                  fontSize: '0.74rem',
+                  fontSize: '0.78rem',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
+                  gap: '6px',
                   wordBreak: 'break-all'
                 }}
               >
@@ -79,4 +82,3 @@ export default function CacheStatusBanner({ result }) {
     </div>
   );
 }
-

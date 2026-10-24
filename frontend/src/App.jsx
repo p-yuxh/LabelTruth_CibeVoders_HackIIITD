@@ -3,17 +3,15 @@ import Header from './components/Header';
 import SearchSection from './components/SearchSection';
 import CacheStatusBanner from './components/CacheStatusBanner';
 import ProductCard from './components/ProductCard';
-import RawJsonViewer from './components/RawJsonViewer';
 import EvidenceModal from './components/EvidenceModal';
 import { auditProduct } from './services/api';
-import { LayoutDashboard, Code2, AlertCircle, Sparkles } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
   const [error, setError] = useState(null);
   const [auditResult, setAuditResult] = useState(null);
-  const [activeTab, setActiveTab] = useState('audit'); // 'audit' | 'json'
   const [evidenceModalOpen, setEvidenceModalOpen] = useState(false);
 
   // Initial search on mount
@@ -24,20 +22,20 @@ export default function App() {
   const handleSearch = async (query, forceRefresh) => {
     setLoading(true);
     setError(null);
-    setLoadingStep('Checking PostgreSQL evidence log cache...');
+    setLoadingStep('Locating product records...');
 
     try {
       const t1 = setTimeout(() => {
-        if (!forceRefresh) setLoadingStep('Querying PostgreSQL Evidence Log cache...');
-        else setLoadingStep('Bypassing cache. Calling TinyFish Search & Fetch APIs...');
+        if (!forceRefresh) setLoadingStep('Retrieving verified product data...');
+        else setLoadingStep('Gathering label disclosures from live brand sources...');
       }, 300);
 
       const t2 = setTimeout(() => {
-        setLoadingStep('Dispatching TinyFish Agent to extract retailer nutrition DOM...');
+        setLoadingStep('Extracting nutritional table and ingredients statement...');
       }, 700);
 
       const t3 = setTimeout(() => {
-        setLoadingStep('Auditing marketing claims & checking palm oil thresholds...');
+        setLoadingStep('Verifying marketing claims against nutrient thresholds...');
       }, 1200);
 
       const res = await auditProduct(query, forceRefresh);
@@ -48,7 +46,7 @@ export default function App() {
 
       setAuditResult(res);
     } catch (err) {
-      setError(err.message || 'An error occurred during product audit.');
+      setError(err.message || 'An error occurred while auditing the product.');
     } finally {
       setLoading(false);
       setLoadingStep('');
@@ -69,79 +67,48 @@ export default function App() {
 
   return (
     <div className="desktop-container">
-      {/* Desktop Dashboard Header */}
+      {/* Header */}
       <Header onOpenEvidenceLogs={() => setEvidenceModalOpen(true)} />
 
-      {/* Product Search & Filters Card */}
+      {/* Product Search Bar */}
       <SearchSection onSearch={handleSearch} loading={loading} />
 
       {/* Loading Progress State */}
       {loading && (
-        <div className="content-card" style={{ alignItems: 'center', textAlign: 'center', padding: '40px 20px' }}>
-          <div className="spinner" style={{ width: '32px', height: '32px', borderColor: 'rgba(16, 185, 129, 0.2)', borderTopColor: '#10b981' }} />
-          <div style={{ fontWeight: 700, fontSize: '1rem', color: '#10b981', marginTop: '16px' }}>
+        <div className="content-card" style={{ alignItems: 'center', textAlign: 'center', padding: '48px 24px' }}>
+          <div className="spinner" style={{ width: '28px', height: '28px' }} />
+          <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#ffffff', marginTop: '18px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             {loadingStep || 'Auditing packaged food claims...'}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '6px' }}>
-            TinyFish Web Agent (DOM Extraction) ➔ LabelTruth Claims Auditor (FSSAI Benchmark) ➔ PostgreSQL Cache
+          <div style={{ fontSize: '0.8rem', color: '#888888', marginTop: '6px' }}>
+            Cross-referencing packaging claims against actual nutrition facts and ingredient statements
           </div>
         </div>
       )}
 
       {/* Error Banner */}
       {error && !loading && (
-        <div className="warning-callout danger" style={{ animation: 'fadeIn 0.3s' }}>
-          <AlertCircle size={22} style={{ flexShrink: 0 }} />
+        <div className="warning-callout alert">
+          <AlertCircle size={20} style={{ flexShrink: 0, color: '#ffffff' }} />
           <div>
-            <strong style={{ fontSize: '0.95rem' }}>Audit Error: </strong>
-            <span>{error}</span>
+            <strong style={{ fontSize: '0.9rem', color: '#ffffff' }}>Audit Notice: </strong>
+            <span style={{ color: '#cccccc' }}>{error}</span>
           </div>
         </div>
       )}
 
-      {/* Audit Results Dashboard */}
+      {/* Audit Results Dossier */}
       {auditResult && !loading && (
         <>
-          {/* Cache Status Banner */}
+          {/* Status Banner */}
           <CacheStatusBanner result={auditResult} />
 
-          {/* Desktop Navigation Tabs */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-            <div className="view-tabs">
-              <button
-                className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}
-                onClick={() => setActiveTab('audit')}
-              >
-                <LayoutDashboard size={17} />
-                <span>Nutrition & Claims Dossier</span>
-              </button>
-              <button
-                className={`tab-btn ${activeTab === 'json' ? 'active' : ''}`}
-                onClick={() => setActiveTab('json')}
-              >
-                <Code2 size={17} />
-                <span>Raw Pipeline & Agent Inspector</span>
-              </button>
-            </div>
-
-            <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
-              Showing audit results for: <strong style={{ color: '#cbd5e1' }}>"{auditResult.query}"</strong>
-            </div>
-          </div>
-
-          {/* Tab 1: Desktop 2-Column Product & Claims Dossier */}
-          {activeTab === 'audit' && (
-            <ProductCard data={auditResult.data} />
-          )}
-
-          {/* Tab 2: Desktop Dual-Pane Raw JSON & TinyFish Inspector */}
-          {activeTab === 'json' && (
-            <RawJsonViewer auditResponse={auditResult} />
-          )}
+          {/* Product & Claims Dossier Card */}
+          <ProductCard data={auditResult.data} />
         </>
       )}
 
-      {/* PostgreSQL Evidence Logs Modal */}
+      {/* Audit History Modal */}
       <EvidenceModal
         isOpen={evidenceModalOpen}
         onClose={() => setEvidenceModalOpen(false)}

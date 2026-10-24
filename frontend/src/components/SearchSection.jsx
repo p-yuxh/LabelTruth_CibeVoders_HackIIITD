@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, RotateCw } from 'lucide-react';
+import { Search, RefreshCw } from 'lucide-react';
 
 const SUGGESTIONS = [
   'Cadbury Bournvita',
@@ -31,7 +31,7 @@ export default function SearchSection({ onSearch, loading }) {
         <input
           type="text"
           className="search-input"
-          placeholder="Search Indian packaged food or brand (e.g. Cadbury Bournvita, Maggi, Too Yumm)..."
+          placeholder="Search packaged food or brand (e.g. Cadbury Bournvita, Maggi Noodles, Too Yumm)..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           disabled={loading}
@@ -45,7 +45,7 @@ export default function SearchSection({ onSearch, loading }) {
             <div className="spinner" />
           ) : (
             <>
-              <Search size={18} />
+              <Search size={16} />
               <span>Audit Product</span>
             </>
           )}
@@ -54,7 +54,7 @@ export default function SearchSection({ onSearch, loading }) {
 
       <div className="search-footer">
         <div className="suggestion-chips">
-          <span className="chip-label">Quick Suggestions:</span>
+          <span className="chip-label">Suggestions:</span>
           {SUGGESTIONS.map((item) => (
             <button
               key={item}
@@ -75,11 +75,11 @@ export default function SearchSection({ onSearch, loading }) {
               checked={forceRefresh}
               onChange={(e) => setForceRefresh(e.target.checked)}
             />
-            <span>Bypass PostgreSQL cache & force fresh TinyFish crawl</span>
+            <span>Force fresh verification from live sources</span>
           </label>
           {forceRefresh && (
-            <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
-              <RotateCw size={12} /> Force Crawl Active
+            <span style={{ color: '#ffffff', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700 }}>
+              <RefreshCw size={12} /> Live Scan Active
             </span>
           )}
         </div>
