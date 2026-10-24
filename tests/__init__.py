@@ -1,2 +1,0 @@
-"""LabelTruth Test Suite"""
-
