@@ -11,6 +11,8 @@ from app.schemas.product import (
     AuditResponse,
     EvidenceLogItem,
     PersonalizeRequest,
+    AlternativesRequest,
+    AlternativesResponse,
 )
 from app.services.orchestrator import AuditOrchestrator
 from app.services.image_detector import ProductImageDetector
@@ -30,6 +32,7 @@ router = APIRouter()
 orchestrator = AuditOrchestrator()
 image_detector = ProductImageDetector()
 scoring_engine = PersonalizedScoringEngine()
+from app.services.recommendation_service import recommendation_service
 standards_registry = ReferenceStandardsRegistry()
 
 
@@ -208,6 +211,49 @@ async def score_personal(request: PersonalizeRequest):
         user_allergens=request.user_allergens or [],
     )
     return score_result
+
+
+@router.post(
+    "/products/{product_id}/alternatives",
+    response_model=AlternativesResponse,
+    summary="Get Better Alternatives for a Product",
+    description="Returns 1 to 5 healthier alternatives for the given product if triggered by poor rating or allergen conflict."
+)
+async def get_product_alternatives(
+    product_id: int,
+    request: AlternativesRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    conditions = list(request.conditions or [])
+    user_allergens = list(request.user_allergens or [])
+    if request.allergens:
+        for a in request.allergens:
+            if a not in user_allergens:
+                user_allergens.append(a)
+
+    if isinstance(request.profile, dict):
+        if "allergens" in request.profile and isinstance(request.profile["allergens"], list):
+            for a in request.profile["allergens"]:
+                if a not in user_allergens:
+                    user_allergens.append(a)
+        if "conditions" in request.profile and isinstance(request.profile["conditions"], list):
+            for c in request.profile["conditions"]:
+                if c not in conditions:
+                    conditions.append(c)
+    elif isinstance(request.profile, str) and request.profile and request.profile != "general_health":
+        if request.profile not in conditions:
+            conditions.append(request.profile)
+
+    if not conditions:
+        conditions = ["general_health"]
+
+    return await recommendation_service.get_alternatives(
+        searched_product_id=product_id,
+        searched_product_data=request.product_data,
+        conditions=conditions,
+        user_allergens=user_allergens,
+        session=db,
+    )
 
 
 @router.post(

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, AlertTriangle, CheckCircle, ExternalLink, ChevronDown, ChevronUp, AlertOctagon, ThumbsUp } from 'lucide-react';
-import { calculatePersonalizedScore } from '../services/api';
+import { ShieldAlert, AlertTriangle, CheckCircle, ExternalLink, ChevronDown, ChevronUp, AlertOctagon } from 'lucide-react';
+import { calculatePersonalizedScore, fetchProductAlternatives } from '../services/api';
 import { getRatingStyle } from '../utils/themeHelpers';
 import PersonalizedRatingBar from './PersonalizedRatingBar';
 
@@ -24,6 +24,15 @@ export default function PersonalizedScoringSection({ productData, initialScoring
   const [selectedConditions, setSelectedConditions] = useState(['general_health']);
   const [selectedAllergens, setSelectedAllergens] = useState([]);
   const [scoreData, setScoreData] = useState(initialScoring || null);
+  const [alternativesData, setAlternativesData] = useState(() => {
+    if (productData?.alternatives && productData.alternatives.status) {
+      return productData.alternatives;
+    }
+    if (productData?.recommendations && productData.recommendations.status) {
+      return productData.recommendations;
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(false);
   const [showNutrientTable, setShowNutrientTable] = useState(false);
   const [showIngredientTable, setShowIngredientTable] = useState(false);
@@ -37,6 +46,23 @@ export default function PersonalizedScoringSection({ productData, initialScoring
       }
     }
   }, [initialScoring]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAlts = async () => {
+      try {
+        const productId = productData?.id || productData?.evidence_log_id || 0;
+        const res = await fetchProductAlternatives(productId, selectedConditions, selectedAllergens, productData);
+        if (isMounted && res) {
+          setAlternativesData(res);
+        }
+      } catch (e) {
+        console.error('Failed to load alternatives', e);
+      }
+    };
+    fetchAlts();
+    return () => { isMounted = false; };
+  }, [productData, selectedConditions, selectedAllergens]);
 
   const handleRecalculate = async (conditions, allergens) => {
     setLoading(true);
@@ -87,7 +113,15 @@ export default function PersonalizedScoringSection({ productData, initialScoring
   const productRatingStyle = getRatingStyle(productRating);
   const nutrientRatingStyle = getRatingStyle(nutrientRating);
   const ingredientRatingStyle = getRatingStyle(ingredientRating);
-  const recommendations = productData?.recommendations || [];
+  const triggers = alternativesData?.trigger || [];
+  const triggerReason = alternativesData?.trigger_reason;
+  const isRatingTrigger = triggers.includes('high_rating') || triggerReason === 'rating_threshold' || triggerReason === 'both';
+  const isAllergenTrigger = triggers.includes('allergen_conflict') || triggerReason === 'allergen_conflict' || triggerReason === 'both';
+
+  const searchedRating = alternativesData?.searched_product?.personalised_rating ?? productRating;
+  const conflictingAllergensList = alternativesData?.searched_product?.conflicting_allergens || allergy?.found_allergens || [];
+  const allergenNames = conflictingAllergensList.length > 0 ? conflictingAllergensList.join(', ') : (selectedAllergens.length > 0 ? selectedAllergens.join(', ') : 'allergen');
+  const displayedAlternatives = (alternativesData?.alternatives || []).slice(0, 5);
 
   return (
     <div className="content-card personalized-card">
@@ -396,62 +430,105 @@ export default function PersonalizedScoringSection({ productData, initialScoring
         </div>
       )}
 
-      {/* 4. RECOMMENDATIONS (Same category, safe only, ranked lowest rating first) */}
-      {showRating && recommendations && recommendations.length > 0 && (
+      {/* 4. BETTER OPTIONS FOR YOU (Gated strictly on status === 'ok' || status === 'none_found') */}
+      {alternativesData && (alternativesData.status === 'ok' || alternativesData.status === 'none_found') && (
         <div className="recommendations-box">
           <div className="recommendations-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ThumbsUp size={18} style={{ color: '#ffffff' }} />
-              <h3 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#ffffff' }}>
-                Healthier Category Alternatives
+            <div>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#ffffff' }}>
+                Better options for you
               </h3>
+              <div style={{ marginTop: '6px', fontSize: '0.8rem', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {isRatingTrigger && searchedRating != null && (
+                  <div>• Rating {searchedRating}/10 for your profile (higher is worse)</div>
+                )}
+                {isAllergenTrigger && (
+                  <div>• Contains an allergen on your list: {allergenNames}</div>
+                )}
+              </div>
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#888888', textTransform: 'uppercase' }}>
-              Ranked by Personalised Rating (Lowest First)
+            <span style={{ fontSize: '0.75rem', color: '#a3a3a3', textTransform: 'uppercase' }}>
+              Lower rating is healthier (Scale 1–10)
             </span>
           </div>
 
-          <div className="recommendations-list">
-            {recommendations.slice(0, 3).map((rec, idx) => (
-              <div key={idx} className="recommendation-item">
-                <div className="rec-header">
-                  <div>
-                    <span className="rec-rank">#{idx + 1} Alternative</span>
-                    <h4 className="rec-title">{rec.product_name}</h4>
-                    <span className="rec-brand">{rec.brand}</span>
-                  </div>
-                  {(() => {
-                    const recStyle = getRatingStyle(rec.personalised_rating);
-                    return (
-                      <div
-                        className="rec-score-box"
-                        style={{
-                          backgroundColor: recStyle.bg,
-                          color: recStyle.text,
-                        }}
-                      >
-                        <span className="rec-score-val" style={{ color: recStyle.text }}>
-                          {rec.personalised_rating}
-                        </span>
-                        <span className="rec-score-denom" style={{ color: recStyle.text, opacity: 0.85 }}>
-                          /10
-                        </span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginLeft: '6px', color: recStyle.text }}>
-                          {recStyle.label}
-                        </span>
+          {alternativesData.status === 'none_found' ? (
+            <div style={{ padding: '16px', background: '#111111', border: '1px solid #333333', color: '#a3a3a3', fontSize: '0.85rem' }}>
+              {alternativesData.message || 'No better alternatives found in this category that meet your allergen and dietary criteria.'}
+            </div>
+          ) : (
+            <div className="recommendations-list">
+              {displayedAlternatives.map((rec, idx) => {
+                const recStyle = getRatingStyle(rec.personalised_rating);
+                const reasonsList = rec.data_reasons || rec.reasons || [];
+                const improvement = rec.rating_improvement ?? rec.rating_delta;
+                return (
+                  <div key={rec.product_id || idx} className="recommendation-item">
+                    <div className="rec-header">
+                      <div>
+                        <span className="rec-rank">Option #{idx + 1}</span>
+                        <h4 className="rec-title">{rec.name || rec.product_name}</h4>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                          <span className="rec-brand">{rec.brand}</span>
+                          {(rec.variant || rec.pack_size) && (
+                            <span style={{ fontSize: '0.75rem', color: '#737373' }}>
+                              • {[rec.variant, rec.pack_size].filter(Boolean).join(' | ')}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    );
-                  })()}
-                </div>
-                <p className="rec-reason">{rec.recommendation_reason}</p>
-                {rec.source_url && (
-                  <a href={rec.source_url} target="_blank" rel="noreferrer" className="citation-link" style={{ marginTop: '6px' }}>
-                    <ExternalLink size={11} /> View Alternative Listing
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div
+                          className="rec-score-box"
+                          style={{
+                            backgroundColor: recStyle.bg,
+                            color: recStyle.text,
+                          }}
+                        >
+                          <span className="rec-score-val" style={{ color: recStyle.text }}>
+                            {rec.personalised_rating}
+                          </span>
+                          <span className="rec-score-denom" style={{ color: recStyle.text, opacity: 0.85 }}>
+                            /10
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#a3a3a3', marginTop: '3px' }}>
+                          Personalised Rating (lower is better)
+                        </div>
+                      </div>
+                    </div>
+
+                    {improvement != null && improvement > 0 && (
+                      <div style={{ fontSize: '0.78rem', color: '#4ade80', fontWeight: 600 }}>
+                        {improvement} points better for your profile
+                      </div>
+                    )}
+
+                    {reasonsList.length > 0 && (
+                      <ul style={{ margin: '4px 0 6px 18px', padding: 0, fontSize: '0.8rem', color: '#e2e8f0', lineHeight: 1.45 }}>
+                        {reasonsList.map((reason, rIdx) => (
+                          <li key={rIdx}>{reason}</li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {isAllergenTrigger && (
+                      <div style={{ fontSize: '0.75rem', color: '#fbbf24', fontStyle: 'italic', marginTop: '2px' }}>
+                        {rec.disclaimer || rec.allergen_statement || `No listed ${allergenNames} in the ingredients. Always check the pack.`}
+                      </div>
+                    )}
+
+                    {rec.source_url && (
+                      <a href={rec.source_url} target="_blank" rel="noreferrer" className="citation-link" style={{ marginTop: '4px', alignSelf: 'flex-start' }}>
+                        <ExternalLink size={11} /> View Source
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

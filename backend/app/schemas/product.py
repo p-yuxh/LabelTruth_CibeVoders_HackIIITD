@@ -1,4 +1,4 @@
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Literal, Union
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -70,6 +70,65 @@ class LabTestCoverage(BaseModel):
     source_url: Optional[str] = None
 
 
+class AlternativeProductItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    product_id: Optional[Any] = None
+    brand: str
+    name: str
+    variant: Optional[str] = None
+    pack_size: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    personalised_rating: float
+    rating_delta: Optional[float] = None
+    rating_improvement: Optional[float] = None
+    data_reasons: List[str] = Field(default_factory=list)
+    reasons: List[str] = Field(default_factory=list)
+    data_confidence: Optional[str] = "high"
+    allergen_status: str = "no_listed_user_allergen"
+    allergen_statement: str = "No listed user allergens in the ingredients. Always check the pack."
+    source_url: str = ""
+    disclaimer: Optional[str] = None
+    data_as_of: str = ""
+
+
+class SearchedProductSummary(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    product_id: Optional[Any] = None
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    personalised_rating: Optional[float] = None
+    rating_scale: str = "1-10, higher is worse"
+    allergen_conflict: bool = False
+    conflicting_allergens: List[str] = Field(default_factory=list)
+
+
+class AlternativesResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    status: Literal["ok", "none_found", "not_needed", "product_not_in_database"]
+    trigger: List[str] = Field(default_factory=list)
+    trigger_reason: Optional[Literal["rating_threshold", "allergen_conflict", "both"]] = None
+    searched_product: SearchedProductSummary
+    alternatives: List[AlternativeProductItem] = Field(default_factory=list)
+    message: str = ""
+    disclaimer: str = (
+        "Ratings are computed for your profile; lower is better. "
+        "Always check physical packaging for current ingredients and allergen warnings."
+    )
+
+
+class AlternativesRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    conditions: Optional[List[str]] = Field(default_factory=lambda: ["general_health"])
+    profile: Optional[Union[Dict[str, Any], str]] = None
+    user_allergens: Optional[List[str]] = Field(default_factory=list)
+    allergens: Optional[List[str]] = Field(default_factory=list)
+    include_reasons: Optional[bool] = True
+    product_data: Optional[Dict[str, Any]] = None
+
+
 class ProductAuditData(BaseModel):
     product_name: ValueWithSource
     brand: ValueWithSource
@@ -83,7 +142,7 @@ class ProductAuditData(BaseModel):
     summary: str
     personalized_scoring: Optional[Dict[str, Any]] = None
     reference_standards: Optional[List[Dict[str, Any]]] = None
-    recommendations: Optional[List[Dict[str, Any]]] = None
+    recommendations: Optional[Any] = None
 
 
 class AuditResponse(BaseModel):

@@ -572,6 +572,17 @@ class PersonalizedScoringEngine:
         selected_conditions = selected_conditions or ["general_health"]
         user_allergens = user_allergens or []
 
+        # Trigger check on current product
+        p_eval = self.evaluate(current_product, selected_conditions, user_allergens)
+        p_rating = p_eval.get("product_rating")
+        p_allergy = p_eval.get("allergy_check", {})
+        has_allergen_conflict = (p_allergy.get("allergy_status") == "NOT SAFE FOR YOU")
+        is_p_rating_valid = (p_rating is not None and isinstance(p_rating, (int, float)) and 1.0 <= p_rating <= 10.0)
+
+        is_high_rating = (is_p_rating_valid and p_rating > 3.0)
+        if not is_high_rating and not has_allergen_conflict:
+            return []
+
         # Determine target category
         curr_cat_val = ""
         cat_item = current_product.get("category", {})
@@ -591,7 +602,8 @@ class PersonalizedScoringEngine:
         all_candidates = []
         seen_names = set()
 
-        for c in (candidate_products or []) + CATEGORY_REFERENCE_PRODUCTS:
+        pool = candidate_products if candidate_products else CATEGORY_REFERENCE_PRODUCTS
+        for c in pool:
             cand_name = ""
             c_name_item = c.get("product_name", {})
             if isinstance(c_name_item, dict):
@@ -646,8 +658,15 @@ class PersonalizedScoringEngine:
             ing_r, top_ing, worst_fl = self.calculate_ingredient_rating(c_ing, c_oil, selected_conditions)
             prod_r, _, _ = self.calculate_product_rating(nutri_r, ing_r)
 
-            if prod_r is None:
+            if prod_r is None or not (1.0 <= prod_r <= 10.0):
                 continue
+
+            if is_high_rating:
+                if not (is_p_rating_valid and prod_r <= (p_rating - 1.0)):
+                    continue
+            else:
+                if not (prod_r <= 3.0):
+                    continue
 
             # 3. Count contradicted / misleading claims for tie-breaking
             flagged_claims_count = sum(
@@ -708,9 +727,18 @@ class PersonalizedScoringEngine:
                 "source_url": candidate.get("product_name", {}).get("source_url", "") if isinstance(candidate.get("product_name"), dict) else "",
             })
 
-        # Rank by Personalised Rating (lowest first), break ties by fewer flagged claims
-        ranked_results.sort(key=lambda x: (x["personalised_rating"], x["flagged_claims_count"]))
-        return ranked_results
+        # Rank by Personalised Rating (lowest first), break ties by fewer flagged claims, then name
+        ranked_results.sort(key=lambda x: (x["personalised_rating"], x["flagged_claims_count"], x["product_name"].lower()))
+        diverse_results = []
+        brand_counts = {}
+        for r in ranked_results:
+            b = r["brand"].strip().lower()
+            if brand_counts.get(b, 0) < 2:
+                brand_counts[b] = brand_counts.get(b, 0) + 1
+                diverse_results.append(r)
+                if len(diverse_results) == 5:
+                    break
+        return diverse_results
 
     def evaluate(
         self,

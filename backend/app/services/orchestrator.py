@@ -75,6 +75,7 @@ class AuditOrchestrator:
             if cached_entry:
                 logger.info(f"CACHE HIT: Returning cached evidence log #{cached_entry.id} for '{cleaned_query}'")
                 product_data = dict(cached_entry.product_data)
+                product_data["id"] = cached_entry.id
                 
                 # Remove legacy score keys if present
                 product_data.pop("claim_integrity_score", None)
@@ -164,11 +165,19 @@ class AuditOrchestrator:
         brand = normalized_data.get("brand", {}).get("value")
         source_urls = tinyfish_result.get("source_urls", [])
 
+        cat_val = normalized_data.get("category", {}).get("value") if isinstance(normalized_data.get("category"), dict) else str(normalized_data.get("category") or "")
+        subcat_val = normalized_data.get("subcategory", {}).get("value") if isinstance(normalized_data.get("subcategory"), dict) else str(normalized_data.get("subcategory") or "")
+
+        db_product_data = dict(normalized_data)
+        db_product_data.pop("recommendations", None)
+
         evidence_log = EvidenceLog(
             query=cleaned_query,
             product_name=product_name,
             brand=brand,
-            product_data=normalized_data,
+            category=cat_val or None,
+            subcategory=subcat_val or None,
+            product_data=db_product_data,
             source_urls=source_urls,
             raw_tinyfish_output={
                 "search_results": tinyfish_result.get("search_results", []),
@@ -181,6 +190,8 @@ class AuditOrchestrator:
         session.add(evidence_log)
         await session.commit()
         await session.refresh(evidence_log)
+
+        normalized_data["id"] = evidence_log.id
 
         logger.info(f"Successfully cached audit result in Evidence Log #{evidence_log.id} for '{cleaned_query}'")
 

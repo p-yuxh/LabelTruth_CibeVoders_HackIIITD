@@ -195,6 +195,36 @@ export async function calculatePersonalizedScore(
   }
 }
 
+export async function fetchProductAlternatives(
+  productId,
+  conditions = ['general_health'],
+  userAllergens = [],
+  productData = null
+) {
+  try {
+    const payload = {
+      conditions: Array.isArray(conditions) ? conditions : [conditions || 'general_health'],
+      user_allergens: userAllergens || [],
+      product_data: productData,
+    };
+    const response = await fetch(`${API_BASE}/products/${productId}/alternatives`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch alternatives');
+    }
+    return await response.json();
+  } catch (err) {
+    console.error('Error fetching product alternatives:', err);
+    return null;
+  }
+}
+
 export async function fetchReferenceStandards(shareOfDaily = 0.15) {
   try {
     const response = await fetch(`${API_BASE}/reference-standards?share_of_daily=${shareOfDaily}`);

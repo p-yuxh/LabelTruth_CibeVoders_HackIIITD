@@ -1,0 +1,13 @@
+{
+  "rating_scale_min": 1,
+  "rating_scale_max": 10,
+  "rating_trigger_threshold": 3,
+  "min_rating_improvement": 1,
+  "allergen_trigger_max_rating": 3,
+  "max_results": 5,
+  "max_per_brand": 2,
+  "candidate_pool_size": 50,
+  "min_data_completeness": 0.8,
+  "category_match_level": "subcategory"
+}
+
