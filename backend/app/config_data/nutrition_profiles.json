@@ -222,6 +222,124 @@
           "notes": "Moderate sodium ceiling for athletic recovery."
         }
       }
+    },
+    "prediabetes": {
+      "name": "Prediabetes-Aware",
+      "description": "Glycemic moderation and carbohydrate restriction according to ADA 2026 and RSSDI guidelines for impaired fasting glucose.",
+      "basis": "per serving",
+      "nutrients": {
+        "sugars_g": {
+          "name": "Total / Added Sugars",
+          "limit": 7.0,
+          "weight": 3.5,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ADA 2026 / RSSDI Added Sugar Moderation in Prediabetes",
+          "source_name": "ADA Standards of Care in Diabetes 2026 & RSSDI",
+          "source_url": "https://diabetesjournals.org/care/issue/49/Supplement_1",
+          "access_date": "2026-10-24",
+          "statutory_status": "Clinical Practice Guideline",
+          "notes": "Moderate added sugar limit (<=7g per serve) to prevent progression to overt type 2 diabetes."
+        },
+        "carbs_g": {
+          "name": "Total Carbohydrates",
+          "limit": 18.0,
+          "weight": 3.0,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ADA 2026 Impaired Glucose Tolerance Carbohydrate Ceiling",
+          "source_name": "ADA Standards of Care in Diabetes 2026",
+          "source_url": "https://diabetesjournals.org/care/issue/49/Supplement_1",
+          "access_date": "2026-10-24",
+          "statutory_status": "Clinical Practice Guideline",
+          "notes": "Carbohydrate control to manage postprandial glycemic excursions."
+        },
+        "saturated_fat_g": {
+          "name": "Saturated Fat",
+          "limit": 2.5,
+          "weight": 2.5,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Cardiovascular Risk Minimization",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Restricted saturated fat to lower cardiometabolic strain."
+        },
+        "sodium_mg": {
+          "name": "Sodium",
+          "limit": 300.0,
+          "weight": 2.0,
+          "unit": "mg",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Sodium Ceiling",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Standard sodium benchmark."
+        }
+      }
+    },
+    "high_cholesterol": {
+      "name": "High Cholesterol / Lipid-Aware",
+      "description": "Cardiovascular risk reduction focusing on minimal saturated and trans fatty acids according to ICMR-NIN 2024 and National Lipid Association.",
+      "basis": "per serving",
+      "nutrients": {
+        "saturated_fat_g": {
+          "name": "Saturated Fat",
+          "limit": 1.5,
+          "weight": 4.5,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "NLA / ICMR-NIN 2024 LDL-C Lowering Saturated Fat Restriction",
+          "source_name": "National Lipid Association & ICMR-NIN 2024",
+          "source_url": "https://www.lipidjournal.com",
+          "access_date": "2026-10-24",
+          "statutory_status": "Clinical Lipid Management Guideline",
+          "notes": "Stringent saturated fat limit (<=1.5g per serve, <7% daily calories) to reduce serum LDL cholesterol and apoB."
+        },
+        "fat_g": {
+          "name": "Total Fat",
+          "limit": 5.0,
+          "weight": 3.0,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Total Fat Restriction for Dyslipidemia",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Total fat restricted to prevent hepatic overproduction of triglycerides."
+        },
+        "sugars_g": {
+          "name": "Total Sugars",
+          "limit": 10.0,
+          "weight": 2.5,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "AHA / ICMR-NIN Triglyceride Lowering Sugar Benchmark",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Refined sugar moderation to prevent hepatic VLDL synthesis."
+        },
+        "sodium_mg": {
+          "name": "Sodium",
+          "limit": 250.0,
+          "weight": 2.5,
+          "unit": "mg",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Vascular Protection Sodium Target",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Sodium cap for arterial protection."
+        }
+      }
     }
   }
 }

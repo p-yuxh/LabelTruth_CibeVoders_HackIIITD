@@ -1,6 +1,13 @@
 const API_BASE = '/api';
 
-export async function auditProduct(query, forceRefresh = false, profile = 'general_health', shareOfDaily = 0.15) {
+export async function auditProduct(
+  query,
+  forceRefresh = false,
+  profile = 'general_health',
+  shareOfDaily = 0.15,
+  conditions = null,
+  userAllergens = null
+) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -15,6 +22,8 @@ export async function auditProduct(query, forceRefresh = false, profile = 'gener
         force_refresh: forceRefresh,
         profile,
         share_of_daily: shareOfDaily,
+        conditions: conditions || (profile ? [profile] : ['general_health']),
+        user_allergens: userAllergens || [],
       }),
       signal: controller.signal,
     });
@@ -130,6 +139,24 @@ export async function fetchEvidenceLogs(limit = 30, offset = 0) {
   }
 }
 
+export async function apiGetIndependentEvidence(query = '', productName = '', brand = '') {
+  try {
+    const params = new URLSearchParams();
+    if (query) params.append('query', query);
+    if (productName) params.append('product_name', productName);
+    if (brand) params.append('brand', brand);
+
+    const response = await fetch(`${API_BASE}/independent-evidence?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('Failed to retrieve independent evidence.');
+    }
+    return await response.json();
+  } catch (err) {
+    console.warn('apiGetIndependentEvidence error:', err);
+    return null;
+  }
+}
+
 export async function calculatePersonalizedScore(
   productData,
   conditions = ['general_health'],
@@ -179,4 +206,170 @@ export async function fetchReferenceStandards(shareOfDaily = 0.15) {
     console.error('Error fetching reference standards:', err);
     throw err;
   }
+}
+
+// ============================================================================
+// Auth & Personalisation APIs
+// ============================================================================
+
+export async function fetchProfileOptions() {
+  try {
+    const res = await fetch(`${API_BASE}/profile-options`);
+    if (!res.ok) throw new Error('Failed to load profile options');
+    return await res.json();
+  } catch (err) {
+    console.error('Error loading profile options:', err);
+    throw err;
+  }
+}
+
+export async function apiSignUp(userData) {
+  const res = await fetch(`${API_BASE}/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Sign up failed.');
+  }
+  return await res.json();
+}
+
+export async function apiLogIn(credentials) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Invalid email or password.');
+  }
+  return await res.json();
+}
+
+export async function apiGetMe(token) {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Session invalid');
+  return await res.json();
+}
+
+export async function apiUpdateUser(data, token) {
+  const res = await fetch(`${API_BASE}/auth/profile`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to update profile.');
+  }
+  return await res.json();
+}
+
+export async function apiVerifyEmail(token) {
+  const res = await fetch(`${API_BASE}/auth/verify-email`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to verify email');
+  return await res.json();
+}
+
+export async function apiForgotPassword(email) {
+  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return await res.json();
+}
+
+export async function apiResetPassword(data) {
+  const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to reset password.');
+  }
+  return await res.json();
+}
+
+export async function apiSaveProfile(profileData, token = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/profile/save`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(profileData),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to save profile.');
+  }
+  return await res.json();
+}
+
+export async function apiExportData(token) {
+  const res = await fetch(`${API_BASE}/auth/export-data`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to export data');
+  return await res.json();
+}
+
+export async function apiDeleteAccount(password, token) {
+  const res = await fetch(`${API_BASE}/auth/account`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to delete account.');
+  }
+  return await res.json();
+}
+
+export async function apiGetSavedComparisons(token) {
+  const res = await fetch(`${API_BASE}/saved-comparisons`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to fetch saved comparisons');
+  return await res.json();
+}
+
+export async function apiCreateSavedComparison(data, token) {
+  const res = await fetch(`${API_BASE}/saved-comparisons`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to save comparison');
+  return await res.json();
+}
+
+export async function apiDeleteSavedComparison(id, token) {
+  const res = await fetch(`${API_BASE}/saved-comparisons/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to delete comparison');
+  return await res.json();
 }

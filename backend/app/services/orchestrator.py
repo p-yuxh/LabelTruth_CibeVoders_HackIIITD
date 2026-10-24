@@ -58,6 +58,20 @@ class AuditOrchestrator:
             result = await session.execute(stmt)
             cached_entry = result.scalar_one_or_none()
 
+            # If no exact query match, attempt smart substring match against query and product name
+            if not cached_entry and len(normalized_query_key) >= 3:
+                stmt_fuzzy = (
+                    select(EvidenceLog)
+                    .where(
+                        (func.lower(EvidenceLog.query).like(f"%{normalized_query_key}%"))
+                        | (func.lower(EvidenceLog.product_name).like(f"%{normalized_query_key}%"))
+                    )
+                    .order_by(EvidenceLog.created_at.desc())
+                    .limit(1)
+                )
+                res_fuzzy = await session.execute(stmt_fuzzy)
+                cached_entry = res_fuzzy.scalar_one_or_none()
+
             if cached_entry:
                 logger.info(f"CACHE HIT: Returning cached evidence log #{cached_entry.id} for '{cleaned_query}'")
                 product_data = dict(cached_entry.product_data)

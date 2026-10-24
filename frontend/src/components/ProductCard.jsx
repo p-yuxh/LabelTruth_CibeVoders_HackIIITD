@@ -1,9 +1,11 @@
-import React from 'react';
-import { ExternalLink, AlertTriangle, CheckCircle, ShieldAlert, FileText, Scale } from 'lucide-react';
+import React, { useState } from 'react';
+import { ExternalLink, AlertTriangle, CheckCircle, ShieldAlert, FileText, Scale, Bookmark, Check } from 'lucide-react';
 import PersonalizedScoringSection from './PersonalizedScoringSection';
 import ClaimVerdictTag from './ClaimVerdictTag';
 import ReferenceStandardsSection from './ReferenceStandardsSection';
 import IndependentEvidenceSection from './IndependentEvidenceSection';
+import { useAuth } from '../context/AuthContext';
+import { apiCreateSavedComparison } from '../services/api';
 
 export default function ProductCard({ data }) {
   if (!data) return null;
@@ -16,7 +18,6 @@ export default function ProductCard({ data }) {
     ingredients = [],
     oil_listed,
     front_pack_claims = [],
-    lab_test_coverage,
     independent_evidence,
     summary,
     personalized_scoring,
@@ -24,6 +25,28 @@ export default function ProductCard({ data }) {
   } = data;
 
   const isPalmOil = oil_listed?.is_palm_oil || false;
+  const { isLoggedIn, token, openAuth } = useAuth();
+  const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const handleSaveComparison = async () => {
+    if (!isLoggedIn) {
+      openAuth('login');
+      return;
+    }
+    try {
+      await apiCreateSavedComparison(
+        {
+          query: product_name?.value || 'Audited Product',
+          product_name: product_name?.value,
+        },
+        token
+      );
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    } catch (err) {
+      console.error('Failed to save comparison:', err);
+    }
+  };
 
 
 
@@ -46,7 +69,27 @@ export default function ProductCard({ data }) {
           {/* Product Hero Header */}
           <div className="product-hero">
             <div className="product-meta">
-              <h2>{product_name?.value || 'Audited Product'}</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                <h2>{product_name?.value || 'Audited Product'}</h2>
+                <button
+                  type="button"
+                  className={`save-comparison-btn ${savedSuccess ? 'saved' : ''}`}
+                  onClick={handleSaveComparison}
+                  title="Save product to comparisons library"
+                >
+                  {savedSuccess ? (
+                    <>
+                      <Check size={13} color="#4ade80" />
+                      <span>Saved</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark size={13} />
+                      <span>Save Comparison</span>
+                    </>
+                  )}
+                </button>
+              </div>
               <div className="product-brand">
                 {brand?.value} {category?.value ? `• ${category?.value}` : ''}
               </div>

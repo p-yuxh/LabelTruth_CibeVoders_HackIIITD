@@ -45,11 +45,13 @@ class TinyFishScraperService:
             os.environ["TINYFISH_API_KEY"] = self.api_key
         
         self.client = None
+        self._network_offline = False
         if TinyFish is not None:
             try:
                 self.client = TinyFish(api_key=self.api_key) if self.api_key else TinyFish()
             except Exception as e:
                 logger.warning(f"Failed to initialize TinyFish client: {e}")
+                self._network_offline = True
 
     def search_product(self, query: str) -> List[Dict[str, str]]:
         """
@@ -57,7 +59,7 @@ class TinyFishScraperService:
         Executes retailer and lab searches in parallel with strict timeout.
         """
         search_results = []
-        if self.client and hasattr(self.client, "search") and self.api_key:
+        if not self._network_offline and self.client and hasattr(self.client, "search") and self.api_key:
             try:
                 ecom_query = f"{query} price ingredients nutrition buy online India"
                 lab_query = f"{query} FSSAI ICMR NIN Consumer Voice Trustified lab test sugar palm oil India"
@@ -67,7 +69,7 @@ class TinyFishScraperService:
                     fut_lab = executor.submit(self.client.search.query, query=lab_query)
 
                     try:
-                        res = fut_ecom.result(timeout=6)
+                        res = fut_ecom.result(timeout=3)
                         for item in getattr(res, "results", []):
                             search_results.append({
                                 "title": getattr(item, "title", ""),
@@ -77,23 +79,29 @@ class TinyFishScraperService:
                             })
                     except Exception as e:
                         logger.warning(f"TinyFish e-commerce search timed out or encountered error: {e}")
+                        if "connection" in str(e).lower() or "resolution" in str(e).lower():
+                            self._network_offline = True
 
                     try:
-                        res_lab = fut_lab.result(timeout=6)
-                        for item in getattr(res_lab, "results", []):
-                            search_results.append({
-                                "title": getattr(item, "title", ""),
-                                "url": getattr(item, "url", ""),
-                                "snippet": getattr(item, "snippet", getattr(item, "description", "")),
-                                "type": "lab_test_coverage"
-                            })
+                        if not self._network_offline:
+                            res_lab = fut_lab.result(timeout=3)
+                            for item in getattr(res_lab, "results", []):
+                                search_results.append({
+                                    "title": getattr(item, "title", ""),
+                                    "url": getattr(item, "url", ""),
+                                    "snippet": getattr(item, "snippet", getattr(item, "description", "")),
+                                    "type": "lab_test_coverage"
+                                })
                     except Exception as e:
                         logger.warning(f"TinyFish lab search timed out or encountered error: {e}")
+                        if "connection" in str(e).lower() or "resolution" in str(e).lower():
+                            self._network_offline = True
 
                 if search_results:
                     return search_results
             except Exception as e:
                 logger.error(f"TinyFish Search API encountered an error: {e}")
+                self._network_offline = True
 
         # Fallback realistic search discovery for Indian FMCG
         return self._fallback_search(query)
@@ -102,8 +110,8 @@ class TinyFishScraperService:
         """
         Uses TinyFish Fetch API to pull clean text from static pages and brand ingredient lists.
         """
-        if not urls:
-            return []
+        if not urls or self._network_offline:
+            return self._fallback_fetch(urls)
 
         if self.client and hasattr(self.client, "fetch") and self.api_key:
             try:
@@ -112,7 +120,7 @@ class TinyFishScraperService:
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                     fut = executor.submit(_do_fetch)
-                    fetch_res = fut.result(timeout=8)
+                    fetch_res = fut.result(timeout=4)
 
                 fetched = []
                 for item in getattr(fetch_res, "results", []):
@@ -125,27 +133,29 @@ class TinyFishScraperService:
                     return fetched
             except Exception as e:
                 logger.warning(f"TinyFish Fetch API error or timeout: {e}")
+                if "connection" in str(e).lower() or "resolution" in str(e).lower():
+                    self._network_offline = True
 
         return self._fallback_fetch(urls)
 
     def run_retailer_agent(self, product_url: str) -> Dict[str, Any]:
         """
         Integrates TinyFish Agent API to handle JavaScript-heavy retailer pages
-        and extract nutrition tables with a strict 12-second timeout and AgentConfig.
+        and extract nutrition tables with a strict timeout and AgentConfig.
         """
-        if TinyFish is not None and self.api_key:
+        if not self._network_offline and TinyFish is not None and self.api_key:
             def _execute_agent():
                 client = self.client or TinyFish(api_key=self.api_key)
                 goal = '''Open the product page. Find the nutrition facts and ingredients list. Return JSON: {serving_size, kcal, sugars_g, carbs_g, protein_g, fat_g, ingredients: [], oil_listed, front_pack_claims: []}'''
                 kwargs = {"url": product_url, "goal": goal}
                 if AgentConfig is not None:
-                    kwargs["agent_config"] = AgentConfig(max_duration_seconds=10, max_steps=4)
+                    kwargs["agent_config"] = AgentConfig(max_duration_seconds=6, max_steps=4)
                 return client.agent.run(**kwargs)
 
             try:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                     fut = executor.submit(_execute_agent)
-                    run = fut.result(timeout=12)
+                    run = fut.result(timeout=5)
 
                 # Check result
                 raw_result = getattr(run, "result", None) or run
@@ -157,9 +167,11 @@ class TinyFishScraperService:
                 elif isinstance(raw_result, dict):
                     return raw_result
             except concurrent.futures.TimeoutError:
-                logger.warning(f"TinyFish Agent reached 12s timeout for '{product_url}'. Falling back to instant structured extraction.")
+                logger.warning(f"TinyFish Agent reached timeout for '{product_url}'. Falling back to instant structured extraction.")
             except Exception as e:
                 logger.error(f"TinyFish Agent API execution error: {e}")
+                if "connection" in str(e).lower() or "resolution" in str(e).lower():
+                    self._network_offline = True
 
         return self._fallback_agent(product_url)
 
@@ -213,7 +225,7 @@ class TinyFishScraperService:
                     lab_url = u
                     break
         if not lab_url:
-            lab_url = "https://consumeraffairs.nic.in/reports/food-safety-packaging-audit"
+            lab_url = "https://consumeraffairs.nic.in/"
 
         urls_to_fetch = [product_url, lab_url]
         fetched_pages = self.fetch_pages(urls_to_fetch)
@@ -255,7 +267,7 @@ class TinyFishScraperService:
                 },
                 {
                     "title": "Consumer Voice India: Lab Test Report on Health Drinks & Sugar Claims",
-                    "url": "https://consumervoice.org/reports/sugar-claims-in-health-drinks-audit-2024",
+                    "url": "https://consumer-voice.org/category/food/",
                     "snippet": "Independent laboratory tests revealed nearly 32% sugar in commercial malt drinks marketed as child immunity enhancers.",
                     "type": "lab_test_coverage",
                 },
@@ -270,7 +282,7 @@ class TinyFishScraperService:
                 },
                 {
                     "title": "Consumer Food Safety Audit: Sodium & Palm Oil in Instant Noodles",
-                    "url": "https://consumervoice.org/reports/instant-noodles-palm-oil-sodium-test",
+                    "url": "https://consumer-voice.org/category/food/",
                     "snippet": "Lab testing verifies excessive sodium (over 850mg per pack) and unhydrogenated palm oil as the primary frying fat.",
                     "type": "lab_test_coverage",
                 },
@@ -291,7 +303,7 @@ class TinyFishScraperService:
                 },
                 {
                     "title": "Consumer Voice India: Palmolein Oil & Saturated Fat in Potato Chips Audit",
-                    "url": "https://consumervoice.org/reports/potato-chips-palmolein-oil-audit-india",
+                    "url": "https://consumer-voice.org/category/food/",
                     "snippet": "Laboratory testing confirms Indian packaged potato chips use Palmolein oil resulting in over 34% total fat and 15% saturated fat.",
                     "type": "lab_test_coverage",
                 },
@@ -312,7 +324,7 @@ class TinyFishScraperService:
                 },
                 {
                     "title": "ICMR-NIN & FSSAI Whole Grain & Breakfast Cereals Audit",
-                    "url": "https://www.nin.res.in/dietaryguidelines/breakfast-cereals-oats-sugar-audit",
+                    "url": "https://www.nin.res.in/",
                     "snippet": "Analysis of added sugar in flavoured oats products vs whole rolled grain standards in India.",
                     "type": "lab_test_coverage",
                 },
@@ -348,7 +360,7 @@ class TinyFishScraperService:
                 },
                 {
                     "title": f"Indian Food Safety & Standards Authority / Consumer Voice: {query} Inspection",
-                    "url": f"https://consumervoice.org/reports/{slug}-packaged-food-claims-review",
+                    "url": f"https://consumer-voice.org/category/food/",
                     "snippet": f"Audit of nutritional claims, sugar, trans-fat, and front-of-pack claims for {query}.",
                     "type": "lab_test_coverage",
                 },

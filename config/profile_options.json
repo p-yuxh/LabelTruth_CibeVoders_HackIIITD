@@ -1,0 +1,241 @@
+{
+  "version": "1.0",
+  "disclaimer": "General information, not medical advice. Follow your doctor's or dietitian's advice.",
+  "consent_notice": "We store your conditions and allergies only to personalise ratings and safety checks. You can delete them anytime.",
+  "consent_version": "1.0",
+  "sections": [
+    {
+      "id": "dietary_conditions",
+      "number": "01",
+      "title": "Dietary Conditions",
+      "is_health_data": true,
+      "description": "Clinical and metabolic conditions that adapt nutrient limits and safety thresholds.",
+      "chips": [
+        {
+          "id": "diabetes",
+          "label": "Diabetes",
+          "type": "nutrient",
+          "target": "diabetes"
+        },
+        {
+          "id": "prediabetes",
+          "label": "Prediabetes",
+          "type": "nutrient",
+          "target": "prediabetes"
+        },
+        {
+          "id": "high_blood_pressure",
+          "label": "High blood pressure",
+          "type": "nutrient",
+          "target": "hypertension"
+        },
+        {
+          "id": "high_cholesterol",
+          "label": "High cholesterol",
+          "type": "nutrient",
+          "target": "high_cholesterol"
+        },
+        {
+          "id": "coeliac_disease",
+          "label": "Coeliac disease / medically required gluten avoidance",
+          "type": "gate",
+          "target": "gluten"
+        },
+        {
+          "id": "lactose_intolerance",
+          "label": "Lactose intolerance",
+          "type": "gate",
+          "target": "milk"
+        }
+      ]
+    },
+    {
+      "id": "allergies",
+      "number": "02",
+      "title": "Allergies",
+      "is_health_data": true,
+      "description": "Hard-stop allergy safety checks run before any rating is calculated.",
+      "chips": [
+        {
+          "id": "peanuts",
+          "label": "Peanuts",
+          "type": "allergy",
+          "target": "peanuts"
+        },
+        {
+          "id": "tree_nuts",
+          "label": "Tree nuts",
+          "type": "allergy",
+          "target": "tree_nuts"
+        },
+        {
+          "id": "milk",
+          "label": "Milk / dairy proteins",
+          "type": "allergy",
+          "target": "milk"
+        },
+        {
+          "id": "eggs",
+          "label": "Eggs",
+          "type": "allergy",
+          "target": "eggs"
+        },
+        {
+          "id": "soy",
+          "label": "Soy",
+          "type": "allergy",
+          "target": "soy"
+        },
+        {
+          "id": "wheat",
+          "label": "Wheat",
+          "type": "allergy",
+          "target": "wheat"
+        },
+        {
+          "id": "gluten",
+          "label": "Gluten",
+          "type": "allergy",
+          "target": "gluten"
+        },
+        {
+          "id": "sesame",
+          "label": "Sesame",
+          "type": "allergy",
+          "target": "sesame"
+        },
+        {
+          "id": "fish_shellfish",
+          "label": "Fish / shellfish",
+          "type": "allergy",
+          "target": "fish_shellfish"
+        }
+      ]
+    },
+    {
+      "id": "nutrition_goals",
+      "number": "03",
+      "title": "Nutrition Goals",
+      "is_health_data": false,
+      "description": "Personal nutritional targets used exclusively for match preferences.",
+      "chips": [
+        {
+          "id": "more_protein",
+          "label": "More protein",
+          "type": "goal",
+          "target": "protein_g"
+        },
+        {
+          "id": "lower_calories",
+          "label": "Lower calories",
+          "type": "goal",
+          "target": "kcal"
+        },
+        {
+          "id": "lower_sugar",
+          "label": "Lower sugar",
+          "type": "goal",
+          "target": "sugars_g"
+        },
+        {
+          "id": "higher_fibre",
+          "label": "Higher fibre",
+          "type": "goal",
+          "target": "fibre_g"
+        },
+        {
+          "id": "lower_sodium",
+          "label": "Lower sodium",
+          "type": "goal",
+          "target": "sodium_mg"
+        },
+        {
+          "id": "lower_saturated_fat",
+          "label": "Lower saturated fat",
+          "type": "goal",
+          "target": "saturated_fat_g"
+        }
+      ]
+    },
+    {
+      "id": "avoid_ingredients",
+      "number": "04",
+      "title": "Ingredients to Avoid",
+      "is_health_data": false,
+      "description": "Ingredients to flag in personal match evaluations (never changes rating).",
+      "chips": [
+        {
+          "id": "palm_oil",
+          "label": "Palm oil",
+          "type": "avoid",
+          "target": "palm_oil"
+        },
+        {
+          "id": "artificial_sweeteners",
+          "label": "Artificial sweeteners",
+          "type": "avoid",
+          "target": "artificial_sweeteners"
+        },
+        {
+          "id": "added_sugar",
+          "label": "Added sugar",
+          "type": "avoid",
+          "target": "added_sugar"
+        },
+        {
+          "id": "caffeine",
+          "label": "Caffeine",
+          "type": "avoid",
+          "target": "caffeine"
+        },
+        {
+          "id": "gelatin",
+          "label": "Gelatin / animal-derived ingredients",
+          "type": "avoid",
+          "target": "gelatin"
+        }
+      ]
+    },
+    {
+      "id": "dietary_pattern",
+      "number": "05",
+      "title": "Dietary Pattern",
+      "is_health_data": false,
+      "is_single_select": true,
+      "description": "General dietary style preference.",
+      "chips": [
+        {
+          "id": "none",
+          "label": "No specific dietary pattern",
+          "type": "dietary_pattern",
+          "target": "none"
+        },
+        {
+          "id": "vegetarian",
+          "label": "Vegetarian",
+          "type": "dietary_pattern",
+          "target": "vegetarian"
+        },
+        {
+          "id": "vegan",
+          "label": "Vegan",
+          "type": "dietary_pattern",
+          "target": "vegan"
+        },
+        {
+          "id": "vegetarian_eggs",
+          "label": "Vegetarian + eggs",
+          "type": "dietary_pattern",
+          "target": "vegetarian_eggs"
+        },
+        {
+          "id": "jain",
+          "label": "Jain food preferences",
+          "type": "dietary_pattern",
+          "target": "jain"
+        }
+      ]
+    }
+  ]
+}
+

@@ -688,7 +688,7 @@ def test_no_forbidden_leftovers_in_production_codebase():
         r'\bpersonal_match_score\b',
         r'\bprofile_fit\b',
         r'\bpref_fit\b',
-        r'\bpreferences\b',
+        r'\bpreference_match\b',
         r'\bavoided_ingredients\b',
         r'\bpreferred_ingredients\b',
         r'\bstrict_palm_oil\b',

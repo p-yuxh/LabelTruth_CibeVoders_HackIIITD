@@ -1,23 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Header from './components/Header';
 import SearchSection from './components/SearchSection';
 import CacheStatusBanner from './components/CacheStatusBanner';
 import ProductCard from './components/ProductCard';
 import EvidenceModal from './components/EvidenceModal';
-import { auditProduct } from './services/api';
+import AuthModal from './components/AuthModal';
+import PersonalizeModal from './components/PersonalizeModal';
+import AccountModal from './components/AccountModal';
+import SavedComparisonsModal from './components/SavedComparisonsModal';
+import LegalModal from './components/LegalModal';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { auditProduct, calculatePersonalizedScore, apiGetIndependentEvidence } from './services/api';
 import { AlertCircle } from 'lucide-react';
 
-export default function App() {
+function MainApp() {
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
   const [error, setError] = useState(null);
   const [auditResult, setAuditResult] = useState(null);
   const [evidenceModalOpen, setEvidenceModalOpen] = useState(false);
 
-  // Empty state until user searches or attaches image
-  // (No automatic search on mount)
-
-  const handleSearch = async (query, forceRefresh) => {
+  const handleSearch = async (query, forceRefresh = false) => {
     setLoading(true);
     setError(null);
     setLoadingStep('Locating product records in evidence registry...');
@@ -45,7 +49,19 @@ export default function App() {
     ];
 
     try {
-      const res = await auditProduct(query, forceRefresh);
+      const activeConditions = (profile?.dietary_conditions && profile.dietary_conditions.length > 0)
+        ? profile.dietary_conditions
+        : ['general_health'];
+      const activeAllergens = profile?.allergies || [];
+
+      const res = await auditProduct(
+        query,
+        forceRefresh,
+        'general_health',
+        0.15,
+        activeConditions,
+        activeAllergens
+      );
       timers.forEach(clearTimeout);
       setAuditResult(res);
     } catch (err) {
@@ -58,16 +74,62 @@ export default function App() {
     }
   };
 
-  const handleSelectCachedLog = (log) => {
+  const handleSelectCachedLog = async (log) => {
+    let pData = log.product_data ? { ...log.product_data } : {};
+
+    // If independent_evidence is missing or incomplete in cached log, load dynamically
+    if (!pData.independent_evidence || !pData.independent_evidence.section_1) {
+      try {
+        const ev = await apiGetIndependentEvidence(
+          log.query,
+          pData.product_name?.value || log.product_name || log.query,
+          pData.brand?.value || log.brand || ''
+        );
+        if (ev) {
+          pData.independent_evidence = ev;
+        }
+      } catch (err) {
+        console.warn('Could not populate independent evidence:', err);
+      }
+    }
+
     setAuditResult({
       query: log.query,
       is_cached: true,
       evidence_log_id: log.id,
       created_at: log.created_at,
       source_urls: log.source_urls || [],
-      data: log.product_data,
-      tinyfish_agent_raw: log.product_data?.tinyfish_agent_raw || null,
+      data: pData,
+      tinyfish_agent_raw: pData?.tinyfish_agent_raw || null,
     });
+  };
+
+  const handleProfileSaved = async (newProfile) => {
+    // If a product is currently viewed, dynamically re-evaluate the scoring with new profile choices
+    if (auditResult && auditResult.data) {
+      try {
+        const conditions = (newProfile.dietary_conditions && newProfile.dietary_conditions.length > 0)
+          ? newProfile.dietary_conditions
+          : ['general_health'];
+        const allergens = newProfile.allergies || [];
+
+        const newScores = await calculatePersonalizedScore({
+          product_data: auditResult.data,
+          conditions,
+          user_allergens: allergens,
+        });
+
+        setAuditResult((prev) => ({
+          ...prev,
+          data: {
+            ...prev.data,
+            personalized_scoring: newScores,
+          },
+        }));
+      } catch (err) {
+        console.error('Error re-rating with updated profile:', err);
+      }
+    }
   };
 
   return (
@@ -131,6 +193,21 @@ export default function App() {
         onClose={() => setEvidenceModalOpen(false)}
         onSelectLog={handleSelectCachedLog}
       />
+
+      {/* Authentication & Profile Modals */}
+      <AuthModal />
+      <PersonalizeModal onProfileSaved={handleProfileSaved} />
+      <AccountModal />
+      <SavedComparisonsModal onSelectComparison={(q) => handleSearch(q, false)} />
+      <LegalModal />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }

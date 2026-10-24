@@ -237,6 +237,14 @@ class PersonalizedScoringEngine:
 
         for cond_key in selected_conditions:
             clean_key = cond_key.lower().strip()
+            # Map condition aliases to canonical profile keys
+            if clean_key in ["high_blood_pressure", "bp"]:
+                clean_key = "hypertension"
+            
+            # Gate-type conditions are handled by allergy & safety check gates, not nutrient limits
+            if clean_key in ["coeliac_disease", "coeliac", "celiac", "celiac_disease", "lactose_intolerance"]:
+                continue
+
             if clean_key not in self.profiles_config:
                 clean_key = "general_health"
 
@@ -261,6 +269,13 @@ class PersonalizedScoringEngine:
                         curr["notes"] = n_spec.get("notes", curr.get("notes"))
                     if n_spec["weight"] > curr["weight"]:
                         curr["weight"] = n_spec["weight"]
+
+        if not merged_nutrients:
+            default_p = self.profiles_config.get("general_health", {})
+            merged_nutrients = {k: dict(v) for k, v in default_p.get("nutrients", {}).items()}
+            if not names:
+                names = [default_p.get("name", "General Health-Aware")]
+                descriptions = [default_p.get("description", "")]
 
         combined_name = " + ".join(dict.fromkeys(names))
         combined_desc = " • ".join(filter(None, dict.fromkeys(descriptions)))
@@ -510,8 +525,14 @@ class PersonalizedScoringEngine:
                 patterns.extend(["gluten", "wheat", "maida", "atta", "semolina", "suji", "barley", "malt", "rye"])
             elif al_clean in ["soy", "soya"]:
                 patterns.extend(["soy", "soya", "soybean", "soybeans", "soy lecithin", "soya lecithin"])
-            elif al_clean in ["nut", "nuts", "tree nut", "tree nuts"]:
-                patterns.extend(["nut", "nuts", "almond", "almonds", "cashew", "cashews", "walnut", "walnuts", "pistachio", "pistachios", "hazelnut", "hazelnuts"])
+            elif al_clean in ["nut", "nuts", "tree nut", "tree nuts", "tree_nuts"]:
+                patterns.extend(["nut", "nuts", "almond", "almonds", "cashew", "cashews", "walnut", "walnuts", "pistachio", "pistachios", "hazelnut", "hazelnuts", "pecan", "macadamia"])
+            elif al_clean in ["egg", "eggs"]:
+                patterns.extend(["egg", "eggs", "albumin", "ovalbumin", "egg yolk", "egg white"])
+            elif al_clean in ["sesame"]:
+                patterns.extend(["sesame", "til", "tila", "gingelly"])
+            elif al_clean in ["fish", "shellfish", "fish_shellfish", "crustacean", "crustaceans"]:
+                patterns.extend(["fish", "prawn", "prawns", "shrimp", "shrimps", "crab", "crabs", "crustacean", "crustaceans", "shellfish", "anchovy", "tuna", "salmon"])
             elif al_clean in ["mustard", "mustards"]:
                 patterns.extend(["mustard", "mustards", "sarson", "rai"])
 
@@ -713,8 +734,19 @@ class PersonalizedScoringEngine:
         oil_info = product_data.get("oil_listed", {})
         oil_declared = oil_info.get("value", "") if isinstance(oil_info, dict) else str(oil_info or "")
 
-        # 1. Allergy Check (Hard Rule)
-        allergy_res = self.check_allergens(ingredients, oil_declared, user_allergens)
+        # Gate conditions integration: coeliac_disease -> gluten, lactose_intolerance -> milk/lactose
+        active_allergens = list(user_allergens)
+        for cond in selected_conditions:
+            c_lower = cond.lower().strip()
+            if c_lower in ["coeliac_disease", "coeliac", "celiac", "celiac_disease"]:
+                if not any(a.lower() in ["gluten", "wheat"] for a in active_allergens):
+                    active_allergens.append("gluten")
+            elif c_lower in ["lactose_intolerance", "lactose"]:
+                if not any(a.lower() in ["milk", "dairy", "lactose"] for a in active_allergens):
+                    active_allergens.append("milk")
+
+        # 1. Allergy & Gate Check (Hard Rule: runs before any rating and can hide it)
+        allergy_res = self.check_allergens(ingredients, oil_declared, active_allergens)
 
         # 2. Nutrient Rating (1-10, lower = better)
         nutri_rating, nutri_breakdown = self.calculate_nutrient_rating(nutrition, selected_conditions)

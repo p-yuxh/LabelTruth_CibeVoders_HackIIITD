@@ -175,9 +175,15 @@ class IndependentEvidenceService:
         target_brand = brand.lower()
         target_name = (product_name or query).lower()
 
-        # Rule 1: Product mismatch
+        # Rule 1: Product & Brand mismatch
         if not same_product:
             return "reported_not_verified", "Product and variant mismatch (Rule 1): The report tests a different product or category."
+
+        if target_brand and p_brand:
+            p_tokens = set(re.findall(r'\b\w{3,}\b', p_brand)) - {"the", "and", "ltd", "pvt", "limited", "company", "india"}
+            t_tokens = set(re.findall(r'\b\w{3,}\b', target_brand)) - {"the", "and", "ltd", "pvt", "limited", "company", "india"}
+            if p_tokens and t_tokens and not (p_tokens & t_tokens):
+                return "reported_not_verified", f"Product and brand mismatch (Rule 1): Laboratory analysis tested {record.get('brand')}, but viewed product is {brand}."
 
         # Rule 2: Metric mismatch
         if not same_metric:
@@ -266,18 +272,33 @@ class IndependentEvidenceService:
             c_seed = (item_dict.get("category") or "").lower()
             combined_seed = f"{p_seed} {b_seed} {k_seed} {c_seed}"
 
-            # 1. Product-specific matches
-            if has_word(r'\bbournvita\b', combined_text) and has_word(r'\bbournvita\b', combined_seed):
-                return True
-            if has_word(r'\b(maggi|noodles?)\b', combined_text) and has_word(r'\b(maggi|noodles?)\b', combined_seed):
-                return True
-            if has_word(r'\b(lays?|chips?|potato\s+chips?|wafers?)\b', combined_text) and has_word(r'\b(lays?|chips?|potato\s+chips?|wafers?)\b', combined_seed):
-                return True
-            if has_word(r'\b(coca[\s-]?cola|coke|\bcola\b|diet\s+coke|zero\s+sugar|pepsi)\b', combined_text) and has_word(r'\b(coca[\s-]?cola|coke|\bcola\b|diet\s+coke|zero\s+sugar|pepsi)\b', combined_seed):
-                return True
-            if has_word(r'\b(butter|amul|ghee|table\s+butter)\b', combined_text) and has_word(r'\b(butter|amul|ghee|table\s+butter)\b', combined_seed):
-                return True
-            if has_word(r'\b(yogabar|yoga\s+bar|dark\s+chocolate\s+oats|oats?|muesli)\b', combined_text) and has_word(r'\b(yogabar|yoga\s+bar|dark\s+chocolate\s+oats|oats?|muesli)\b', combined_seed):
+            # 1. Product-specific patterns (query_pattern, seed_pattern)
+            product_patterns = [
+                (r'\bbournvita\b', r'\bbournvita\b'),
+                (r'\bmaggi\b', r'\bmaggi\b'),
+                (r'\b(lays?|lay\'s)\b', r'\b(lays?|lay\'s)\b'),
+                (r'\b(coca[\s-]?cola|diet\s+coke|\bcoke\b)\b', r'\b(coca[\s-]?cola|diet\s+coke|\bcoke\b)\b'),
+                (r'\b(butter|amul\s+butter|table\s+butter)\b', r'\b(butter|amul\s+butter|table\s+butter)\b'),
+                (r'\b(yogabar|yoga\s+bar|dark\s+chocolate\s+oats)\b', r'\b(yogabar|yoga\s+bar|dark\s+chocolate\s+oats)\b'),
+                (r'\b(parle[\s-]?g|parle)\b', r'\b(parle[\s-]?g|parle)\b'),
+                (r'\bkurkure\b', r'\bkurkure\b'),
+                (r'\b(kissan|kissan\s+jam)\b', r'\b(kissan|kissan\s+jam)\b'),
+                (r'\bfrooti\b', r'\bfrooti\b'),
+                (r'\b(yippee|yippe)\b', r'\b(yippee|yippe)\b'),
+                (r'\bpaper\s*boat\b', r'\bpaper\s*boat\b'),
+                (r'\bpringles\b', r'\bpringles\b'),
+                (r'\btop\s*ramen\b', r'\btop\s*ramen\b'),
+                (r'\b(nissin|cup\s*noodles)\b', r'\b(nissin|cup\s*noodles)\b'),
+                (r'\bhaldiram\b', r'\bhaldiram\b'),
+            ]
+
+            for q_pat, s_pat in product_patterns:
+                if has_word(q_pat, combined_text) and has_word(s_pat, combined_seed):
+                    return True
+
+            # Direct word token match if product tokens match
+            p_tokens = [w for w in re.findall(r'\b\w{4,}\b', p_seed) if w not in {"with", "from", "pack", "india", "flavor", "flavour"}]
+            if p_tokens and all(has_word(rf'\b{re.escape(w)}\b', combined_text) for w in p_tokens):
                 return True
 
             return False

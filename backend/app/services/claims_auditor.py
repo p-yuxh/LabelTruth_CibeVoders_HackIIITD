@@ -57,7 +57,7 @@ class LabelTruthClaimsAuditor:
         **kwargs,
     ) -> Dict[str, Any]:
         product_url = tinyfish_data.get("target_product_url", "https://blinkit.com")
-        lab_url = tinyfish_data.get("target_lab_url", "https://consumervoice.org")
+        lab_url = tinyfish_data.get("target_lab_url", "https://consumer-voice.org/category/food/")
         agent_data = tinyfish_data.get("agent_data", {})
         fetched_pages = tinyfish_data.get("fetched_pages", [])
         search_results = tinyfish_data.get("search_results", [])
@@ -489,17 +489,21 @@ class LabelTruthClaimsAuditor:
 
     def _summarize_lab_coverage(self, search_results: List, lab_url: str) -> Dict[str, Any]:
         lab_hits = [r for r in search_results if r.get("type") == "lab_test_coverage"]
+        clean_lab_url = lab_url.replace("consumervoice.org", "consumer-voice.org") if lab_url else "https://consumer-voice.org/category/food/"
         if lab_hits:
             hit = lab_hits[0]
+            raw_url = hit.get("url") or clean_lab_url
+            if "consumervoice.org" in raw_url:
+                raw_url = raw_url.replace("consumervoice.org", "consumer-voice.org")
             return {
                 "has_lab_tests": True,
                 "summary": hit.get("snippet") or "Independent consumer laboratory tests audited sugar and ingredient claims.",
-                "source_url": hit.get("url") or lab_url
+                "source_url": raw_url
             }
         return {
             "has_lab_tests": False,
             "summary": "No adverse regulatory orders found in the national consumer testing repository.",
-            "source_url": lab_url
+            "source_url": clean_lab_url
         }
 
     def _generate_summary(
