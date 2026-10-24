@@ -1,358 +1,414 @@
 import React, { useState, useEffect } from 'react';
-import { UserCheck, ShieldAlert, Sliders, CheckSquare, Square, Info, Activity, AlertCircle } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, CheckCircle, ExternalLink, Sliders, ChevronDown, ChevronUp, AlertOctagon } from 'lucide-react';
 import { calculatePersonalizedScore } from '../services/api';
 
-const PROFILES = [
-  {
-    key: 'general_health',
-    name: 'General Health-Aware',
-    tagline: 'Balanced everyday nutrition; no specific medical dietary needs.',
-  },
-  {
-    key: 'diabetes_aware',
-    name: 'Diabetes-Aware',
-    tagline: 'Places more emphasis on carbohydrate suitability, serving size and fibre.',
-  },
-  {
-    key: 'protein_conscious',
-    name: 'Protein-Conscious',
-    tagline: 'Prioritizes protein intake and evaluates against high-protein targets.',
-  },
+const AVAILABLE_PROFILES = [
+  { key: 'general_health', label: 'General Health-Aware', desc: 'ICMR-NIN 2024 everyday nutritional guidelines.' },
+  { key: 'diabetes', label: 'Diabetes-Aware', desc: 'ADA 2026 / RSSDI strict carbohydrate and free sugar limits.' },
+  { key: 'hypertension', label: 'Hypertension-Aware', desc: 'WHO / ICMR-NIN strict sodium cap (<=200mg/serve) and healthy fats.' },
+  { key: 'protein_conscious', label: 'Protein-Conscious', desc: 'Fitness profile with controlled sugars and saturated fat.' },
 ];
 
-const GOAL_OPTIONS = [
-  { id: 'lower_sugar', label: 'Lower Sugar' },
-  { id: 'higher_protein', label: 'Higher Protein' },
-  { id: 'low_sodium', label: 'Low Sodium' },
-  { id: 'low_saturated_fat', label: 'Low Saturated Fat' },
+const COMMON_ALLERGENS = [
+  'Gluten / Wheat',
+  'Milk / Dairy',
+  'Peanuts',
+  'Tree Nuts',
+  'Soy',
+  'Mustard',
+];
+
+const PREFERENCE_OPTIONS = [
+  { id: 'avoid_palm_oil', label: 'Avoid Palm Oil' },
+  { id: 'avoid_undisclosed_oil', label: 'Avoid Undisclosed Oil' },
+  { id: 'avoid_artificial_sweeteners', label: 'Avoid Artificial Sweeteners' },
+  { id: 'prefer_whole_grains', label: 'Prefer Whole Grains' },
 ];
 
 export default function PersonalizedScoringSection({ productData, initialScoring }) {
-  const [activeProfile, setActiveProfile] = useState(
-    initialScoring?.profile_key || 'general_health'
-  );
-  const [strictPalmOil, setStrictPalmOil] = useState(
-    initialScoring?.is_hard_excluded || false
-  );
-  const [selectedGoals, setSelectedGoals] = useState([]);
-  const [shareOfDaily, setShareOfDaily] = useState(0.15);
+  const [selectedConditions, setSelectedConditions] = useState(['general_health']);
+  const [selectedAllergens, setSelectedAllergens] = useState([]);
+  const [selectedPreferences, setSelectedPreferences] = useState([]);
   const [scoreData, setScoreData] = useState(initialScoring || null);
   const [loading, setLoading] = useState(false);
+  const [showNutrientTable, setShowNutrientTable] = useState(false);
+  const [showIngredientTable, setShowIngredientTable] = useState(false);
 
-  // When initialScoring updates from parent, synchronize
+  // Synchronize when initialScoring updates
   useEffect(() => {
     if (initialScoring) {
       setScoreData(initialScoring);
+      if (initialScoring.selected_conditions) {
+        setSelectedConditions(initialScoring.selected_conditions);
+      }
     }
   }, [initialScoring]);
 
-  // Recalculate score dynamically when profile or goals change
-  const handleRecalculate = async (newProfile, newStrictPalm, newGoals, newShare) => {
-    // If precomputed all_profiles exist and no custom goals are toggled, update instantly
-    if (
-      scoreData?.all_profiles?.[newProfile] &&
-      newGoals.length === 0 &&
-      newShare === 0.15
-    ) {
-      const precomputed = scoreData.all_profiles[newProfile];
-      // Check hard exclusion
-      const isExcluded = newStrictPalm && precomputed.palm_oil_status === 'confirmed';
-      setScoreData({
-        ...precomputed,
-        all_profiles: scoreData.all_profiles,
-        is_hard_excluded: isExcluded,
-        personal_match_score: isExcluded ? 0 : precomputed.personal_match_score,
-        status: isExcluded ? 'EXCLUDED' : 'MATCHED',
-        hard_exclusion_reason: isExcluded
-          ? 'Strict Palm Oil Avoidance: Product confirmed to contain Palm Oil / Palmolein. Hard exclusion overrides other nutritional scores.'
-          : null,
-      });
-      return;
-    }
-
+  const handleRecalculate = async (conditions, allergens, preferences) => {
     setLoading(true);
     try {
-      const res = await calculatePersonalizedScore(
-        productData,
-        newProfile,
-        newStrictPalm,
-        newGoals,
-        newShare
-      );
+      const avoided = [];
+      const preferred = [];
+
+      if (preferences.includes('avoid_palm_oil')) avoided.push('palm oil');
+      if (preferences.includes('avoid_artificial_sweeteners')) avoided.push('aspartame', 'acesulfame', 'sucralose');
+      if (preferences.includes('prefer_whole_grains')) preferred.push('whole wheat', 'oats', 'multigrain');
+
+      const res = await calculatePersonalizedScore({
+        product_data: productData,
+        conditions,
+        user_allergens: allergens,
+        preferences,
+        avoided_ingredients: avoided,
+        preferred_ingredients: preferred,
+      });
       setScoreData(res);
     } catch (err) {
-      console.error('Failed to compute personalized score:', err);
+      console.error('Error recalculating personalized scores:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleProfileSelect = (profKey) => {
-    setActiveProfile(profKey);
-    handleRecalculate(profKey, strictPalmOil, selectedGoals, shareOfDaily);
+  const toggleCondition = (key) => {
+    let next;
+    if (selectedConditions.includes(key)) {
+      next = selectedConditions.filter((k) => k !== key);
+      if (next.length === 0) next = ['general_health'];
+    } else {
+      next = [...selectedConditions, key];
+    }
+    setSelectedConditions(next);
+    handleRecalculate(next, selectedAllergens, selectedPreferences);
   };
 
-  const handleStrictPalmToggle = () => {
-    const nextStrict = !strictPalmOil;
-    setStrictPalmOil(nextStrict);
-    handleRecalculate(activeProfile, nextStrict, selectedGoals, shareOfDaily);
+  const toggleAllergen = (item) => {
+    const next = selectedAllergens.includes(item)
+      ? selectedAllergens.filter((a) => a !== item)
+      : [...selectedAllergens, item];
+    setSelectedAllergens(next);
+    handleRecalculate(selectedConditions, next, selectedPreferences);
   };
 
-  const handleGoalToggle = (goalId) => {
-    const nextGoals = selectedGoals.includes(goalId)
-      ? selectedGoals.filter((g) => g !== goalId)
-      : [...selectedGoals, goalId];
-    setSelectedGoals(nextGoals);
-    handleRecalculate(activeProfile, strictPalmOil, nextGoals, shareOfDaily);
-  };
-
-  const handleShareChange = (shareVal) => {
-    setShareOfDaily(shareVal);
-    handleRecalculate(activeProfile, strictPalmOil, selectedGoals, shareVal);
+  const togglePreference = (prefId) => {
+    const next = selectedPreferences.includes(prefId)
+      ? selectedPreferences.filter((p) => p !== prefId)
+      : [...selectedPreferences, prefId];
+    setSelectedPreferences(next);
+    handleRecalculate(selectedConditions, selectedAllergens, next);
   };
 
   if (!scoreData) return null;
 
-  const isExcluded = scoreData.is_hard_excluded;
+  const allergy = scoreData.allergy_check || { allergy_status: 'NONE FOUND', is_safe: true };
+  const isNotSafe = allergy.allergy_status === 'NOT SAFE FOR YOU';
+  const showScores = scoreData.show_scores && !isNotSafe;
+
+  const productRating = scoreData.product_rating;
+  const nutrientRating = scoreData.nutrient_rating;
+  const ingredientRating = scoreData.ingredient_rating;
   const matchScore = scoreData.personal_match_score;
-  const profileFit = scoreData.profile_suitability;
-  const prefFit = scoreData.preference_match;
+  const matchDetails = scoreData.match_details || {};
+
+  const getRatingBadge = (val) => {
+    if (val === null || val === undefined) return { label: 'N/A', cls: 'badge-muted' };
+    if (val <= 3.5) return { label: 'FAVORABLE (LOW RISK)', cls: 'badge-good' };
+    if (val <= 6.5) return { label: 'MODERATE RISK', cls: 'badge-warning' };
+    return { label: 'HIGH RISK / EXCEEDS LIMITS', cls: 'badge-bad' };
+  };
+
+  const ratingBadge = getRatingBadge(productRating);
 
   return (
-    <div className="personalized-section" style={{ background: '#0a0a0a', border: '1px solid #2a2a2a', padding: '24px', marginBottom: '24px' }}>
-      {/* Section Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #222222', paddingBottom: '16px', marginBottom: '18px' }}>
+    <div className="content-card personalized-card">
+      {/* 1. Header & Profile Selector */}
+      <div className="personalized-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <UserCheck size={18} style={{ color: '#ffffff' }} />
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#ffffff' }}>
-              Personalized Product Scoring
-            </h3>
+          <div className="section-eyebrow">Evidence-Based Personalization</div>
+          <h2 className="personalized-title">Health Profile & Preference Evaluation</h2>
+          <div className="personalized-subtitle">
+            {scoreData.conditions_title || 'General Health-Aware'}
+            {selectedConditions.length > 1 && (
+              <span className="multi-condition-tag">
+                [Multiple Conditions Active: Strictest Limit & Highest Weight Applied]
+              </span>
+            )}
           </div>
-          <p style={{ fontSize: '0.8rem', color: '#888888', marginTop: '4px' }}>
-            One product record, different user-specific scores. Assesses nutritional fit for a selected profile, then adjusts for personal goals.
-          </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#888888' }}>
-          <span>Serving Share:</span>
-          {[0.10, 0.15, 0.20].map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => handleShareChange(s)}
-              style={{
-                background: shareOfDaily === s ? '#ffffff' : '#141414',
-                color: shareOfDaily === s ? '#000000' : '#888888',
-                border: '1px solid #333333',
-                padding: '2px 8px',
-                fontSize: '0.72rem',
-                cursor: 'pointer',
-                fontWeight: shareOfDaily === s ? 700 : 400,
-              }}
-            >
-              {Math.round(s * 100)}%
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Profile Selector Tabs */}
-      <div style={{ marginBottom: '18px' }}>
-        <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#a3a3a3', letterSpacing: '0.05em', marginBottom: '8px' }}>
-          Select Health Profile:
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-          {PROFILES.map((p) => {
-            const isActive = activeProfile === p.key;
-            const profileScore = scoreData?.all_profiles?.[p.key]?.personal_match_score;
+        {/* Condition Selection Pills */}
+        <div className="condition-pills-row">
+          {AVAILABLE_PROFILES.map((p) => {
+            const active = selectedConditions.includes(p.key);
             return (
               <button
                 key={p.key}
                 type="button"
-                onClick={() => handleProfileSelect(p.key)}
-                style={{
-                  background: isActive ? '#ffffff' : '#141414',
-                  color: isActive ? '#000000' : '#cccccc',
-                  border: isActive ? '1px solid #ffffff' : '1px solid #2a2a2a',
-                  padding: '12px 14px',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  position: 'relative',
-                }}
+                className={`condition-pill ${active ? 'active' : ''}`}
+                onClick={() => toggleCondition(p.key)}
+                title={p.desc}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '0.84rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {p.name}
-                  </strong>
-                  {profileScore !== undefined && (
-                    <span style={{ fontSize: '0.78rem', fontWeight: 800, padding: '2px 6px', background: isActive ? '#000000' : '#222222', color: isActive ? '#ffffff' : '#ffffff' }}>
-                      {strictPalmOil && scoreData?.palm_oil_status === 'confirmed' ? 'EXC' : profileScore}
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: '0.72rem', marginTop: '4px', opacity: isActive ? 0.8 : 0.6, lineHeight: 1.3 }}>
-                  {p.tagline}
-                </div>
+                {active ? '✓ ' : '+ '}
+                {p.label}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Preference Toggles Bar */}
-      <div style={{ background: '#121212', border: '1px solid #222222', padding: '14px 16px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#a3a3a3', letterSpacing: '0.05em' }}>
-              Preferences:
-            </span>
-
-            {/* Strict Palm Oil Avoidance Toggle */}
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.8rem',
-                color: strictPalmOil ? '#ffffff' : '#a3a3a3',
-                cursor: 'pointer',
-                fontWeight: strictPalmOil ? 700 : 400,
-                border: strictPalmOil ? '1px solid #ffffff' : '1px solid transparent',
-                padding: '4px 8px',
-                background: strictPalmOil ? '#222222' : 'transparent',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={strictPalmOil}
-                onChange={handleStrictPalmToggle}
-                style={{ display: 'none' }}
-              />
-              {strictPalmOil ? <CheckSquare size={15} color="#ffffff" /> : <Square size={15} color="#666666" />}
-              <span>Strict Palm-Oil Avoidance (Hard Exclusion)</span>
-            </label>
-
-            {/* Configurable Goals */}
-            {GOAL_OPTIONS.map((g) => {
-              const isChecked = selectedGoals.includes(g.id);
-              return (
-                <label
-                  key={g.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.78rem',
-                    color: isChecked ? '#ffffff' : '#888888',
-                    cursor: 'pointer',
-                    fontWeight: isChecked ? 600 : 400,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => handleGoalToggle(g.id)}
-                    style={{ display: 'none' }}
-                  />
-                  {isChecked ? <CheckSquare size={14} color="#ffffff" /> : <Square size={14} color="#555555" />}
-                  <span>{g.label}</span>
-                </label>
-              );
-            })}
+      {/* 2. ALLERGY CHECK (Hard Rule: If NOT SAFE, show no scores) */}
+      <div className={`allergy-bar ${isNotSafe ? 'alert-danger' : allergy.allergy_status === 'CANNOT CONFIRM' ? 'alert-warning' : 'alert-safe'}`}>
+        <div className="allergy-bar-content">
+          {isNotSafe ? (
+            <AlertOctagon size={20} className="allergy-icon danger" />
+          ) : allergy.allergy_status === 'CANNOT CONFIRM' ? (
+            <AlertTriangle size={20} className="allergy-icon warning" />
+          ) : (
+            <CheckCircle size={20} className="allergy-icon safe" />
+          )}
+          <div>
+            <div className="allergy-status-heading">
+              ALLERGY STATUS: <strong>{allergy.allergy_status}</strong>
+            </div>
+            <div className="allergy-status-msg">{allergy.message}</div>
           </div>
+        </div>
+
+        {/* Allergen Filters */}
+        <div className="allergen-picker">
+          <span className="picker-label">Your Allergens:</span>
+          {COMMON_ALLERGENS.map((al) => {
+            const checked = selectedAllergens.includes(al);
+            return (
+              <button
+                key={al}
+                type="button"
+                className={`picker-chip ${checked ? 'selected' : ''}`}
+                onClick={() => toggleAllergen(al)}
+              >
+                {checked ? '☒' : '☐'} {al}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Hard Exclusion Banner */}
-      {isExcluded && (
-        <div style={{ background: '#000000', border: '2px solid #ffffff', padding: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+      {/* IF ALLERGY FAILS: SHOW NO SCORES */}
+      {isNotSafe && (
+        <div className="safety-suppression-notice">
           <ShieldAlert size={28} style={{ color: '#ffffff', flexShrink: 0 }} />
           <div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#ffffff' }}>
-              Hard Exclusion Triggered: Strict Palm Oil Avoidance
-            </div>
-            <p style={{ fontSize: '0.82rem', color: '#cccccc', marginTop: '4px', lineHeight: 1.4 }}>
-              {scoreData.hard_exclusion_reason || 'Product confirmed to contain Palm Oil / Palmolein. Per LabelTruth specification, high protein or low sugar cannot compensate for strict palm-oil avoidance.'}
+            <h3>NUTRITIONAL RATINGS SUPPRESSED FOR SAFETY</h3>
+            <p>
+              This product contains confirmed ingredients matching your declared allergens.
+              Per clinical safety protocols, nutritional fit scores and match ratings are withheld to prevent consumption.
             </p>
           </div>
         </div>
       )}
 
-      {/* Primary Score Showcase */}
-      <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: '24px', alignItems: 'center', background: '#000000', border: '1px solid #222222', padding: '20px' }}>
-        {/* Left: Square Match Badge */}
-        <div style={{ background: isExcluded ? '#1a1a1a' : '#ffffff', color: isExcluded ? '#ffffff' : '#000000', border: '1px solid #ffffff', padding: '18px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: '2.5rem', fontWeight: 900, lineHeight: 1, letterSpacing: '-0.04em' }}>
-            {isExcluded ? 'EXC' : matchScore}
-          </div>
-          <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '6px' }}>
-            {isExcluded ? 'Hard Excluded' : 'Personal Match'}
-          </div>
-        </div>
-
-        {/* Right: Formula Breakdown & Interpretation */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#a3a3a3', letterSpacing: '0.06em' }}>
-              Formula:
-            </span>
-            <code style={{ fontSize: '0.82rem', color: '#ffffff', background: '#141414', padding: '3px 8px', border: '1px solid #2a2a2a' }}>
-              {scoreData.formula_breakdown}
-            </code>
-          </div>
-
-          <div style={{ fontSize: '0.78rem', color: '#a3a3a3', marginBottom: '10px' }}>
-            Calculation: <span style={{ color: '#ffffff' }}>{scoreData.calculation_detail}</span>
-          </div>
-
-          {/* Interpretation matching the PDF */}
-          <div style={{ borderLeft: '3px solid #ffffff', paddingLeft: '12px', marginTop: '10px' }}>
-            <strong style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#ffffff', letterSpacing: '0.04em' }}>
-              Interpretation:{' '}
-            </strong>
-            <span style={{ fontSize: '0.84rem', color: '#cccccc' }}>
-              {scoreData.interpretation}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Profiles Side-by-Side Context Bar (from PDF: 3 illustrative examples) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #222222' }}>
-        {PROFILES.map((p) => {
-          const item = scoreData?.all_profiles?.[p.key];
-          if (!item) return null;
-          const isCurrent = activeProfile === p.key;
-          return (
-            <div
-              key={p.key}
-              style={{
-                background: isCurrent ? '#161616' : '#0d0d0d',
-                border: isCurrent ? '1px solid #ffffff' : '1px solid #222222',
-                padding: '12px',
-                fontSize: '0.75rem',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ffffff', fontWeight: 700, marginBottom: '4px' }}>
-                <span>{p.name}</span>
-                <span style={{ fontWeight: 900 }}>MATCH {strictPalmOil && scoreData?.palm_oil_status === 'confirmed' ? '0 (EXC)' : item.personal_match_score}</span>
+      {/* 3. SHOW THE TWO DISTINCT SEPARATE SCORES (DO NOT BLEND) */}
+      {showScores && (
+        <div className="two-scores-grid">
+          {/* OUTPUT 1: PERSONALISED RATING (1-10, lower = better) */}
+          <div className="score-panel rating-panel">
+            <div className="score-panel-top">
+              <div>
+                <span className="panel-kicker">OUTPUT 1</span>
+                <h3 className="panel-title">Personalised Rating</h3>
+                <span className="scale-hint">(Scale: 1 – 10 • Lower is Better)</span>
               </div>
-              <div style={{ color: '#888888', fontSize: '0.7rem' }}>
-                Profile Fit: {item.profile_suitability} • Pref Fit: {item.preference_match}
+              <div className="score-box-large">
+                <span className="score-value-big">{productRating ?? '—'}</span>
+                <span className="score-denom">/ 10</span>
               </div>
             </div>
-          );
-        })}
-      </div>
 
-      {/* Guardrail Disclaimer */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#666666', marginTop: '14px' }}>
-        <Info size={13} style={{ flexShrink: 0 }} />
-        <span>{scoreData.guardrail_note || 'Scores illustrate personalization logic; they are not clinical assessments or validated product ratings.'}</span>
-      </div>
+            <div className="rating-badge-row">
+              <span className={`status-badge-solid ${ratingBadge.cls}`}>{ratingBadge.label}</span>
+              {scoreData.is_partial_data && (
+                <span className="partial-data-badge" title={scoreData.partial_data_note}>
+                  [PARTIAL DATA]
+                </span>
+              )}
+            </div>
+
+            <div className="component-breakdown-row">
+              <div className="sub-component-box">
+                <div className="sub-val">{nutrientRating ?? '—'}<span className="sub-denom">/10</span></div>
+                <div className="sub-label">Nutrient Rating (60%)</div>
+                <div className="sub-desc">Weighted r_k with clinical worst-case safety floor</div>
+              </div>
+              <div className="sub-component-box">
+                <div className="sub-val">{ingredientRating ?? '—'}<span className="sub-denom">/10</span></div>
+                <div className="sub-label">Ingredient Rating (40%)</div>
+                <div className="sub-desc">Position-weighted (first=n, last=1) with flagged override</div>
+              </div>
+            </div>
+
+            {/* Toggle Expandable Nutrient Rating Table */}
+            <div className="expand-strip">
+              <button
+                type="button"
+                className="btn-text-toggle"
+                onClick={() => setShowNutrientTable(!showNutrientTable)}
+              >
+                <span>{showNutrientTable ? 'Hide' : 'View'} Nutrient Breakdown & Citations ({scoreData.nutrient_breakdown?.length || 0})</span>
+                {showNutrientTable ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+            </div>
+
+            {showNutrientTable && (
+              <div className="table-wrapper">
+                <table className="breakdown-table">
+                  <thead>
+                    <tr>
+                      <th>Nutrient</th>
+                      <th>Actual</th>
+                      <th>Limit</th>
+                      <th>Excess %</th>
+                      <th>Score (r_k)</th>
+                      <th>Weight</th>
+                      <th>Basis</th>
+                      <th>Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scoreData.nutrient_breakdown?.map((n) => (
+                      <tr key={n.nutrient_key} className={n.r_k > 1 ? 'row-excess' : ''}>
+                        <td><strong>{n.name}</strong></td>
+                        <td>{n.actual}{n.unit}</td>
+                        <td>{n.limit}{n.unit}</td>
+                        <td>{n.excess_pct > 0 ? `+${n.excess_pct}%` : '0%'}</td>
+                        <td><span className={`rk-badge rk-${n.r_k}`}>{n.r_k}/10</span></td>
+                        <td>{n.weight}</td>
+                        <td className="basis-cell">{n.basis}</td>
+                        <td>
+                          <a href={n.source_url} target="_blank" rel="noreferrer" className="citation-anchor">
+                            {n.source_name} <ExternalLink size={10} />
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Toggle Expandable Top Ingredients Breakdown */}
+            <div className="expand-strip">
+              <button
+                type="button"
+                className="btn-text-toggle"
+                onClick={() => setShowIngredientTable(!showIngredientTable)}
+              >
+                <span>{showIngredientTable ? 'Hide' : 'View'} Top Contributing Ingredients ({scoreData.top_ingredients?.length || 0})</span>
+                {showIngredientTable ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+            </div>
+
+            {showIngredientTable && (
+              <div className="table-wrapper">
+                <table className="breakdown-table">
+                  <thead>
+                    <tr>
+                      <th>Ingredient</th>
+                      <th>Position</th>
+                      <th>Weight</th>
+                      <th>Risk Score</th>
+                      <th>Reason / Finding</th>
+                      <th>Statutory Citation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scoreData.top_ingredients?.map((ing, idx) => (
+                      <tr key={idx} className={ing.is_flagged ? 'row-excess' : ''}>
+                        <td><strong>{ing.name}</strong></td>
+                        <td>#{ing.position}</td>
+                        <td>{ing.position_weight}</td>
+                        <td><span className={`rk-badge rk-${ing.risk_score}`}>{ing.risk_score}/10</span></td>
+                        <td style={{ fontSize: '0.78rem' }}>{ing.flag_reason}</td>
+                        <td>
+                          <a href={ing.source_url} target="_blank" rel="noreferrer" className="citation-anchor">
+                            {ing.source_name} <ExternalLink size={10} />
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* OUTPUT 2: PERSONAL MATCH SCORE (0-100, higher = better, preferences only) */}
+          <div className="score-panel match-panel">
+            <div className="score-panel-top">
+              <div>
+                <span className="panel-kicker">OUTPUT 2</span>
+                <h3 className="panel-title">Personal Match Score</h3>
+                <span className="scale-hint">(Scale: 0 – 100 • Higher is Better • Preferences Only)</span>
+              </div>
+              <div className="score-box-large">
+                <span className="score-value-big">{matchScore ?? '—'}</span>
+                <span className="score-denom">/ 100</span>
+              </div>
+            </div>
+
+            <div className="preferences-status-tag">
+              Status: <strong>{matchDetails.preferences_label || 'No preferences selected'}</strong>
+            </div>
+
+            {/* Preferences Checkboxes */}
+            <div className="preferences-toggles-box">
+              <span className="picker-label">Your Preferences:</span>
+              <div className="prefs-wrap">
+                {PREFERENCE_OPTIONS.map((opt) => {
+                  const checked = selectedPreferences.includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      className={`pref-checkbox-btn ${checked ? 'checked' : ''}`}
+                      onClick={() => togglePreference(opt.id)}
+                    >
+                      {checked ? '☑ ' : '☐ '}
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Itemized Audit Ledger behind Personal Match Score */}
+            <div className="ledger-box">
+              <div className="ledger-heading">CALCULATION BREAKDOWN (START: 100)</div>
+              {matchDetails.deductions && matchDetails.deductions.length > 0 ? (
+                <div className="ledger-list">
+                  {matchDetails.deductions.map((d, idx) => (
+                    <div key={idx} className="ledger-row">
+                      <span className="ledger-desc">{d.description}</span>
+                      <span className={`ledger-pts ${d.points < 0 ? 'neg' : 'pos'}`}>
+                        {d.points > 0 ? `+${d.points}` : d.points}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="ledger-row ledger-total">
+                    <strong>Final Clamped Match Score</strong>
+                    <strong>{matchScore} / 100</strong>
+                  </div>
+                </div>
+              ) : (
+                <div className="no-prefs-note">
+                  {matchDetails.has_preferences
+                    ? 'All stated ingredient and quality preferences satisfied. No deductions applied.'
+                    : 'No preferences selected. Rating reflects baseline claim and nutrient penalties only.'}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

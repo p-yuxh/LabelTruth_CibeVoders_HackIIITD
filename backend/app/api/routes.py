@@ -51,14 +51,23 @@ async def audit_product(
         )
 
     try:
+        # Merge conditions and preferences
+        conditions = request.conditions or ([request.profile] if request.profile else ["general_health"])
+        preferences = list(request.preferences or [])
+        if request.strict_palm_oil and "avoid_palm_oil" not in preferences:
+            preferences.append("avoid_palm_oil")
+        if request.goals:
+            preferences.extend(request.goals)
+
         result = await orchestrator.audit_product(
             session=db,
             query=request.query,
             force_refresh=request.force_refresh,
-            profile=request.profile or "general_health",
-            strict_palm_oil=bool(request.strict_palm_oil),
-            goals=request.goals or [],
-            share_of_daily=request.share_of_daily if request.share_of_daily is not None else 0.15,
+            conditions=conditions,
+            user_allergens=request.user_allergens or [],
+            preferences=preferences,
+            avoided_ingredients=request.avoided_ingredients or [],
+            preferred_ingredients=request.preferred_ingredients or [],
         )
         return result
     except HTTPException:
@@ -197,25 +206,25 @@ async def get_evidence_log(
 
 @router.post(
     "/score-personal",
-    summary="Instant Personalized Score Calculation",
-    description="Calculates profile suitability (0-100), preference match (0-100), and personal match score (75/25) for any product payload with hard exclusion checks."
+    summary="Instant Personalized Rating & Match Score Calculation",
+    description="Calculates Personalised Rating (1-10, lower=better), Personal Match Score (0-100, preferences only), and Allergy Check."
 )
 async def score_personal(request: PersonalizeRequest):
-    engine = PersonalizedScoringEngine(share_of_daily=request.share_of_daily)
-    score_result = engine.evaluate_personalized_fit(
+    conditions = request.conditions or ([request.profile] if request.profile else ["general_health"])
+    preferences = list(request.preferences or [])
+    if request.strict_palm_oil and "avoid_palm_oil" not in preferences:
+        preferences.append("avoid_palm_oil")
+    if request.goals:
+        preferences.extend(request.goals)
+
+    score_result = scoring_engine.evaluate(
         product_data=request.product_data,
-        profile_key=request.profile,
-        strict_palm_oil_avoidance=request.strict_palm_oil,
-        preferred_goals=request.goals,
-        share_of_daily=request.share_of_daily
+        selected_conditions=conditions,
+        user_allergens=request.user_allergens or [],
+        preferences=preferences,
+        avoided_ingredients=request.avoided_ingredients or [],
+        preferred_ingredients=request.preferred_ingredients or [],
     )
-    all_profiles = engine.evaluate_all_three_profiles(
-        product_data=request.product_data,
-        strict_palm_oil_avoidance=request.strict_palm_oil,
-        preferred_goals=request.goals,
-        share_of_daily=request.share_of_daily
-    )
-    score_result["all_profiles"] = all_profiles
     return score_result
 
 
@@ -226,15 +235,15 @@ async def score_personal(request: PersonalizeRequest):
 )
 async def get_reference_standards(share_of_daily: float = 0.15):
     from dataclasses import asdict
-    engine = PersonalizedScoringEngine(share_of_daily=share_of_daily)
+    registry = ReferenceStandardsRegistry(default_share_of_daily=share_of_daily)
     return {
         "access_date": "2026-10-24",
         "share_of_daily_applied": share_of_daily,
         "per_serving_limits": {
-            "sugar": engine.registry.get_per_serving_benchmark("sugar", share_of_daily),
-            "sodium": engine.registry.get_per_serving_benchmark("sodium", share_of_daily),
-            "saturated_fat": engine.registry.get_per_serving_benchmark("saturated_fat", share_of_daily),
-            "diabetes_snack_carbs": engine.registry.get_per_serving_benchmark("diabetes_carbs", share_of_daily),
+            "sugar": registry.get_per_serving_benchmark("sugar", share_of_daily),
+            "sodium": registry.get_per_serving_benchmark("sodium", share_of_daily),
+            "saturated_fat": registry.get_per_serving_benchmark("saturated_fat", share_of_daily),
+            "diabetes_snack_carbs": registry.get_per_serving_benchmark("diabetes_carbs", share_of_daily),
         },
         "statutory_claim_rules": [asdict(v) for v in FSSAI_CLAIM_RULES.values()],
         "daily_guidelines": [asdict(v) for v in ICMR_NIN_DAILY_LIMITS.values()],

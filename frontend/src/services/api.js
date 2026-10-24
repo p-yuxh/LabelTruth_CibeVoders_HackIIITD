@@ -95,25 +95,38 @@ export async function fetchEvidenceLogs(limit = 30, offset = 0) {
   }
 }
 
-export async function calculatePersonalizedScore(productData, profile = 'general_health', strictPalmOil = false, goals = [], shareOfDaily = 0.15) {
+export async function calculatePersonalizedScore(
+  productData,
+  conditions = ['general_health'],
+  userAllergens = [],
+  preferences = [],
+  avoidedIngredients = [],
+  preferredIngredients = []
+) {
   try {
+    // If first argument is an options object
+    const payload = productData && typeof productData === 'object' && productData.product_data
+      ? productData
+      : {
+          product_data: productData,
+          conditions: Array.isArray(conditions) ? conditions : [conditions || 'general_health'],
+          user_allergens: userAllergens,
+          preferences,
+          avoided_ingredients: avoidedIngredients,
+          preferred_ingredients: preferredIngredients,
+        };
+
     const response = await fetch(`${API_BASE}/score-personal`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        product_data: productData,
-        profile,
-        strict_palm_oil: strictPalmOil,
-        goals,
-        share_of_daily: shareOfDaily,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Failed to compute personalized score.');
+      throw new Error(errorData.detail || 'Failed to compute personalized rating and match score.');
     }
 
     return await response.json();

@@ -1,0 +1,228 @@
+{
+  "profiles": {
+    "general_health": {
+      "name": "General Health-Aware",
+      "description": "Everyday healthy eating guidelines based on ICMR-NIN 2024 recommendations.",
+      "basis": "per serving",
+      "nutrients": {
+        "sugars_g": {
+          "name": "Total / Added Sugars",
+          "limit": 15.0,
+          "weight": 3.0,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Added Sugar Benchmark",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Daily added sugar threshold 25g/day; max 15g per packaged snack serving."
+        },
+        "sodium_mg": {
+          "name": "Sodium",
+          "limit": 300.0,
+          "weight": 3.0,
+          "unit": "mg",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Salt / Sodium Upper Limit",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Salt upper limit 5g/day (2000mg sodium); max 300mg sodium per snack serving (15% daily share)."
+        },
+        "saturated_fat_g": {
+          "name": "Saturated Fat",
+          "limit": 3.0,
+          "weight": 2.5,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Saturated Fat Restriction",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Saturated fat restricted to <= 8-10% of total energy."
+        },
+        "fat_g": {
+          "name": "Total Fat",
+          "limit": 8.0,
+          "weight": 1.5,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Total Fat Limit",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Total fat should not exceed 30% of daily energy."
+        },
+        "carbs_g": {
+          "name": "Carbohydrates",
+          "limit": 25.0,
+          "weight": 1.0,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Balanced Carbohydrate Allocation",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Balanced everyday carbohydrate serving ceiling."
+        }
+      }
+    },
+    "diabetes": {
+      "name": "Diabetes-Aware",
+      "description": "Strict carbohydrate, sugar, and glycemic control according to ADA 2026 and RSSDI.",
+      "basis": "per serving",
+      "nutrients": {
+        "sugars_g": {
+          "name": "Total / Added Sugars",
+          "limit": 5.0,
+          "weight": 4.0,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ADA 2026 / RSSDI Free Sugar Ceiling for Diabetics",
+          "source_name": "ADA Standards of Care in Diabetes 2026 & RSSDI",
+          "source_url": "https://diabetesjournals.org/care/issue/49/Supplement_1",
+          "access_date": "2026-10-24",
+          "statutory_status": "Clinical Practice Guideline",
+          "notes": "Strict limit on added and simple sugars (<5g per serve) to avoid postprandial glucose excursions."
+        },
+        "carbs_g": {
+          "name": "Total Carbohydrates",
+          "limit": 15.0,
+          "weight": 3.5,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ADA 2026 Carbohydrate Counting Target",
+          "source_name": "ADA Standards of Care in Diabetes 2026 & RSSDI",
+          "source_url": "https://diabetesjournals.org/care/issue/49/Supplement_1",
+          "access_date": "2026-10-24",
+          "statutory_status": "Clinical Practice Guideline",
+          "notes": "Standard single carbohydrate choice ceiling (15g carbohydrate = 1 carb count)."
+        },
+        "saturated_fat_g": {
+          "name": "Saturated Fat",
+          "limit": 2.5,
+          "weight": 2.5,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ADA 2026 Cardiovascular Risk Reduction in Diabetes",
+          "source_name": "ADA Standards of Care in Diabetes 2026",
+          "source_url": "https://diabetesjournals.org/care/issue/49/Supplement_1",
+          "access_date": "2026-10-24",
+          "statutory_status": "Clinical Practice Guideline",
+          "notes": "Strict saturated fat ceiling due to elevated macrovascular risk in diabetes."
+        },
+        "sodium_mg": {
+          "name": "Sodium",
+          "limit": 300.0,
+          "weight": 2.0,
+          "unit": "mg",
+          "basis": "per serving",
+          "rule_name": "ADA 2026 Blood Pressure & Sodium Guidance",
+          "source_name": "ADA Standards of Care in Diabetes 2026",
+          "source_url": "https://diabetesjournals.org/care/issue/49/Supplement_1",
+          "access_date": "2026-10-24",
+          "statutory_status": "Clinical Practice Guideline",
+          "notes": "Sodium restriction to curb diabetic nephropathy and hypertension comorbidity."
+        }
+      }
+    },
+    "hypertension": {
+      "name": "Hypertension-Aware",
+      "description": "Cardiovascular and blood pressure management focusing on low sodium and healthy fats.",
+      "basis": "per serving",
+      "nutrients": {
+        "sodium_mg": {
+          "name": "Sodium",
+          "limit": 200.0,
+          "weight": 4.5,
+          "unit": "mg",
+          "basis": "per serving",
+          "rule_name": "WHO / ICMR-NIN Strict Sodium Reduction Benchmark",
+          "source_name": "WHO Sodium Intake Guidelines & ICMR-NIN 2024",
+          "source_url": "https://www.who.int",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Global Guideline",
+          "notes": "Strict sodium cap (<=200mg per serve) for hypertensive individuals."
+        },
+        "saturated_fat_g": {
+          "name": "Saturated Fat",
+          "limit": 2.5,
+          "weight": 3.0,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Cardiovascular Lipid Guideline",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Restricted saturated fat to lower arterial stiffness."
+        },
+        "sugars_g": {
+          "name": "Total Sugars",
+          "limit": 10.0,
+          "weight": 2.0,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Added Sugar Moderation",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Added sugar limit to manage metabolic vascular strain."
+        }
+      }
+    },
+    "protein_conscious": {
+      "name": "Protein-Conscious",
+      "description": "Fitness and active lifestyle profile prioritizing high protein with controlled sugar and saturated fat.",
+      "basis": "per serving",
+      "nutrients": {
+        "sugars_g": {
+          "name": "Total Sugars",
+          "limit": 8.0,
+          "weight": 3.0,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Lean Fitness Sugar Ceiling",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Avoid empty refined sugar calories in fitness nutrition."
+        },
+        "saturated_fat_g": {
+          "name": "Saturated Fat",
+          "limit": 3.5,
+          "weight": 2.0,
+          "unit": "g",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Lipid Balance Benchmark",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Control saturated cooking fats."
+        },
+        "sodium_mg": {
+          "name": "Sodium",
+          "limit": 350.0,
+          "weight": 2.0,
+          "unit": "mg",
+          "basis": "per serving",
+          "rule_name": "ICMR-NIN 2024 Sodium Moderation",
+          "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+          "source_url": "https://www.nin.res.in",
+          "access_date": "2026-10-24",
+          "statutory_status": "Official Dietary Guideline",
+          "notes": "Moderate sodium ceiling for athletic recovery."
+        }
+      }
+    }
+  }
+}
+

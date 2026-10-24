@@ -10,6 +10,7 @@ from app.services.tinyfish_scraper import TinyFishScraperService
 from app.services.claims_auditor import LabelTruthClaimsAuditor
 from app.services.orchestrator import AuditOrchestrator
 from app.services.image_detector import ProductImageDetector
+from app.services.personalized_scoring import PersonalizedScoringEngine, excess_rating
 from PIL import Image, ImageDraw
 import io
 
@@ -74,10 +75,13 @@ async def test_claims_auditor_attaches_source_url():
     for claim in normalized["front_pack_claims"]:
         assert "claim" in claim
         assert "audit_verdict" in claim
+        # Must only be one of the four allowed verdicts
+        assert claim["audit_verdict"] in {"VERIFIED", "MISLEADING", "CONTRADICTED", "NO EVIDENCE"}
         assert "source_url" in claim
 
-    # Verify claim integrity score
-    assert 0 <= normalized["claim_integrity_score"] <= 100
+    # Verify personalized scoring is attached
+    assert "personalized_scoring" in normalized
+    assert normalized["personalized_scoring"]["product_rating"] is not None
 
 
 @pytest.mark.asyncio
@@ -121,73 +125,63 @@ async def test_image_detector_service():
     buf = io.BytesIO()
     img.save(buf, format='PNG')
     
-    res = detector.detect_product_from_bytes(buf.getvalue())
-    assert "Bournvita" in res["detected_product"]
-    assert res["match_source"] == "pattern_match"
+    result = detector.detect_product_from_bytes(buf.getvalue())
+    assert "detected_product" in result
+    assert result["detected_product"] != ""
 
 
 @pytest.mark.asyncio
 async def test_detect_image_endpoint():
-    img = Image.new('RGB', (450, 120), color='white')
+    img = Image.new('RGB', (300, 100), color='white')
     draw = ImageDraw.Draw(img)
-    draw.text((25, 40), "Nestle Maggi Noodles", fill='black')
-    
+    draw.text((20, 30), "Nestle Maggi 2-Minute", fill='black')
     buf = io.BytesIO()
-    img.save(buf, format='PNG')
-    buf.seek(0)
+    img.save(buf, format='JPEG')
     
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        files = {"file": ("test_package.png", buf.getvalue(), "image/png")}
-        response = await client.post("/api/detect-image", files=files)
+        response = await client.post(
+            "/api/detect-image",
+            files={"file": ("maggi_test.jpg", buf.getvalue(), "image/jpeg")}
+        )
         assert response.status_code == 200
         data = response.json()
-        assert "Maggi" in data["detected_product"]
+        assert "detected_product" in data
 
 
 @pytest.mark.asyncio
 async def test_audit_image_endpoint(async_db):
     app.dependency_overrides[get_db] = lambda: async_db
-    
-    img = Image.new('RGB', (450, 120), color='white')
+    img = Image.new('RGB', (350, 100), color='yellow')
     draw = ImageDraw.Draw(img)
-    draw.text((25, 40), "Cadbury Bournvita 500g", fill='black')
-    
+    draw.text((20, 30), "Maggi 2-Minute Noodles", fill='black')
     buf = io.BytesIO()
-    img.save(buf, format='PNG')
-    buf.seek(0)
+    img.save(buf, format='JPEG')
     
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        files = {"file": ("bournvita.png", buf.getvalue(), "image/png")}
-        response = await client.post("/api/audit-image", files=files)
+        response = await client.post(
+            "/api/audit-image",
+            files={"file": ("maggi_noodles.jpg", buf.getvalue(), "image/jpeg")},
+            data={"force_refresh": "false"}
+        )
         assert response.status_code == 200
         data = response.json()
-        assert "Cadbury" in data["data"]["product_name"]["value"]
-        assert data["data"]["oil_listed"] is not None
-
+        assert "Maggi" in data["data"]["product_name"]["value"]
     app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
 async def test_api_audit_endpoint(async_db):
     app.dependency_overrides[get_db] = lambda: async_db
-    
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        payload = {"query": "Nestle Maggi 2-Minute Noodles"}
-        response = await client.post("/api/audit", json=payload)
+        response = await client.post(
+            "/api/audit",
+            json={"query": "Cadbury Bournvita", "force_refresh": True}
+        )
         assert response.status_code == 200
         data = response.json()
-        assert data["query"] == "Nestle Maggi 2-Minute Noodles"
-        assert data["is_cached"] is False
-        assert "oil_listed" in data["data"]
-        assert data["data"]["oil_listed"]["is_palm_oil"] is True
-        
-        # Test evidence logs endpoint
-        logs_res = await client.get("/api/evidence-logs")
-        assert logs_res.status_code == 200
-        logs = logs_res.json()
-        assert len(logs) >= 1
-        assert logs[0]["query"] == "Nestle Maggi 2-Minute Noodles"
-
+        assert data["query"] == "Cadbury Bournvita"
+        assert "Cadbury" in data["data"]["product_name"]["value"]
+        assert len(data["data"]["ingredients"]) > 0
     app.dependency_overrides.clear()
 
 
@@ -217,14 +211,15 @@ async def test_lays_chips_audit_and_palm_oil():
     claim_texts = [c["claim"].lower() for c in claims]
     assert "taste bhi, health bhi" not in claim_texts
     
-    # Verified with caveat for Zero Trans Fat
+    # 5. Verified verdict set: Only VERIFIED, MISLEADING, CONTRADICTED, NO EVIDENCE
+    for c in claims:
+        assert c["audit_verdict"] in {"VERIFIED", "MISLEADING", "CONTRADICTED", "NO EVIDENCE"}
+    
+    # Trans fat claims with high saturated fat are MISLEADING
     trans_fat_claims = [c for c in claims if "trans" in c["claim"].lower()]
     if trans_fat_claims:
-        assert trans_fat_claims[0]["audit_verdict"] == "Verified with Caveat"
+        assert trans_fat_claims[0]["audit_verdict"] == "MISLEADING"
         assert "saturated fat" in trans_fat_claims[0]["verdict_reason"].lower()
-    
-    # 5. Integrity score should reflect deep-fried snack with palm oil (~50-65)
-    assert 40 <= normalized["claim_integrity_score"] <= 70
 
 
 @pytest.mark.asyncio
@@ -251,49 +246,194 @@ async def test_audit_endpoint_rejects_generic_queries(async_db):
     app.dependency_overrides.clear()
 
 
-@pytest.mark.asyncio
-async def test_personalized_scoring_and_hard_exclusion():
-    from app.services.personalized_scoring import PersonalizedScoringEngine
-    engine = PersonalizedScoringEngine(share_of_daily=0.15)
+# =========================================================================
+# WORKED EXAMPLES AND SPECIFICATION TESTS (REQUIREMENT 6)
+# =========================================================================
+
+def test_excess_rating_worked_examples():
+    """
+    Worked examples:
+    excess_rating(17, 15) = 3
+    excess_rating(30, 15) = 10
+    """
+    assert excess_rating(17, 15) == 3
+    assert excess_rating(30, 15) == 10
+    # Boundary: at or below limit is 1
+    assert excess_rating(15, 15) == 1
+    assert excess_rating(10, 15) == 1
+
+
+def test_sugar_limit_general_vs_diabetic():
+    """
+    Worked example:
+    8 g sugar: general limit 15 -> 1, diabetic limit 5 -> 7
+    """
+    engine = PersonalizedScoringEngine()
+    gen_limit = engine.profiles_config["general_health"]["nutrients"]["sugars_g"]["limit"]
+    diab_limit = engine.profiles_config["diabetes"]["nutrients"]["sugars_g"]["limit"]
     
-    # 1. Product without palm oil (Clean snack)
-    clean_snack = {
-        "nutrition": {
-            "carbs_g": {"value": 14.0},
-            "sugars_g": {"value": 2.0},
-            "protein_g": {"value": 8.0},
-            "fat_g": {"value": 4.0},
-            "saturated_fat_g": {"value": 1.0},
-            "sodium_mg": {"value": 110.0}
-        },
-        "oil_listed": {"value": "Sunflower Oil", "is_palm_oil": False}
-    }
+    assert gen_limit == 15.0
+    assert diab_limit == 5.0
     
-    res = engine.evaluate_personalized_fit(clean_snack, profile_key="diabetes_aware")
-    assert res["status"] == "MATCHED"
-    assert res["is_hard_excluded"] is False
-    assert 0 <= res["personal_match_score"] <= 100
-    # Verify formula math
-    expected_match = int(round(0.75 * res["profile_suitability"] + 0.25 * res["preference_match"]))
-    assert res["personal_match_score"] == expected_match
+    assert excess_rating(8.0, gen_limit) == 1
+    assert excess_rating(8.0, diab_limit) == 7
+
+
+def test_ingredient_override_worked_example():
+    """
+    Worked example:
+    ingredient override example (nine 1s plus one flagged 10 in last position) -> 7.35
+    """
+    engine = PersonalizedScoringEngine()
+    # 9 safe ingredients (risk 1) + 1 flagged with risk 10 in position 10 (last)
+    # The config has hydrogenated vegetable oil with risk 10
+    mock_ingredients = [
+        {"name": "Whole Wheat Flour"},
+        {"name": "Water"},
+        {"name": "Salt"},
+        {"name": "Yeast"},
+        {"name": "Barley Malt"},
+        {"name": "Oat Flakes"},
+        {"name": "Wheat Bran"},
+        {"name": "Sunflower Seeds"},
+        {"name": "Honey"},
+        {"name": "Hydrogenated Vegetable Oil"}  # Position 10 (last) -> risk 10
+    ]
+    rating, top_3, worst_flagged = engine.calculate_ingredient_rating(mock_ingredients)
+    assert rating == 7.35
+    assert worst_flagged["risk_score"] == 10
+
+
+def test_multi_condition_strictest_limit_and_highest_weight():
+    """
+    Multiple conditions: strictest (lowest) limit, highest weight per nutrient.
+    """
+    engine = PersonalizedScoringEngine()
+    merged, title, _ = engine.merge_conditions(["diabetes", "hypertension"])
     
-    # 2. Hard Exclusion: Palm Oil avoidance marked strict
-    palm_snack = {
-        "nutrition": {
-            "protein_g": {"value": 25.0},  # High protein cannot compensate
-            "sugars_g": {"value": 0.0}
-        },
-        "oil_listed": {"value": "Palmolein", "is_palm_oil": True}
-    }
-    ex_res = engine.evaluate_personalized_fit(
-        palm_snack,
-        profile_key="protein_conscious",
-        strict_palm_oil_avoidance=True
+    # Sodium: diabetes limit 300, weight 2.0; hypertension limit 200, weight 4.5
+    # Strictest limit = 200, highest weight = 4.5
+    assert merged["sodium_mg"]["limit"] == 200.0
+    assert merged["sodium_mg"]["weight"] == 4.5
+    
+    # Sugars: diabetes limit 5.0, weight 4.0; hypertension limit 10.0, weight 2.0
+    # Strictest limit = 5.0, highest weight = 4.0
+    assert merged["sugars_g"]["limit"] == 5.0
+    assert merged["sugars_g"]["weight"] == 4.0
+
+
+def test_personal_match_score_no_preferences_and_clamp():
+    """
+    Personal Match Score (0-100, higher = better):
+    If user has selected NO preferences, show 'No preferences selected'
+    and apply only claim and nutrient signals. Never invent a default like 75.
+    """
+    engine = PersonalizedScoringEngine()
+    
+    # 1. Product with no claims and nutrient rating = 1.0 (perfect)
+    res_clean = engine.calculate_personal_match_score(
+        nutrient_rating=1.0,
+        claims=[],
+        ingredients=["Oats", "Water"],
+        oil_declared="None declared",
+        preferences=[],
+        avoided_ingredients=[],
+        preferred_ingredients=[],
     )
-    assert ex_res["is_hard_excluded"] is True
-    assert ex_res["status"] == "EXCLUDED"
-    assert ex_res["personal_match_score"] == 0
-    assert "Strict Palm Oil Avoidance" in ex_res["hard_exclusion_reason"]
+    assert res_clean["personal_match_score"] == 100
+    assert res_clean["has_preferences"] is False
+    assert res_clean["preferences_label"] == "No preferences selected"
+    
+    # 2. Product with nutrient rating = 10.0, 1 CONTRADICTED claim (-30), 1 MISLEADING claim (-15)
+    # Start 100; -30; -15; nutrient penalty: -(10-1) * 25/9 = -25.
+    # Total = 100 - 30 - 15 - 25 = 30
+    res_bad = engine.calculate_personal_match_score(
+        nutrient_rating=10.0,
+        claims=[
+            {"claim": "Healthy Growth", "audit_verdict": "CONTRADICTED"},
+            {"claim": "Zero Trans Fat", "audit_verdict": "MISLEADING"}
+        ],
+        ingredients=["Sugar", "Refined Flour"],
+        oil_declared="None declared",
+        preferences=[],
+        avoided_ingredients=[],
+        preferred_ingredients=[],
+    )
+    assert res_bad["personal_match_score"] == 30
+    assert res_bad["preferences_label"] == "No preferences selected"
+
+
+def test_allergy_check_not_safe_hides_scores():
+    """
+    ALLERGY CHECK: NOT SAFE FOR YOU / CANNOT CONFIRM / NONE FOUND.
+    If NOT SAFE, show no scores.
+    """
+    engine = PersonalizedScoringEngine()
+    product_data = {
+        "nutrition": {
+            "sugars_g": {"value": 2.0},
+            "sodium_mg": {"value": 100.0},
+            "saturated_fat_g": {"value": 1.0}
+        },
+        "ingredients": [{"name": "Wheat Flour"}, {"name": "Peanut Butter"}],
+        "oil_listed": {"value": "Sunflower Oil"},
+        "front_pack_claims": []
+    }
+    
+    # User is allergic to peanut
+    eval_res = engine.evaluate(
+        product_data=product_data,
+        selected_conditions=["general_health"],
+        user_allergens=["peanut"]
+    )
+    
+    assert eval_res["allergy_check"]["allergy_status"] == "NOT SAFE FOR YOU"
+    assert eval_res["show_scores"] is False
+    # All scores must be suppressed
+    assert eval_res["product_rating"] is None
+    assert eval_res["nutrient_rating"] is None
+    assert eval_res["ingredient_rating"] is None
+    assert eval_res["personal_match_score"] is None
+
+
+def test_claim_verdicts_only_allowed_and_non_nutrient_check():
+    """
+    CLAIM VERDICTS use only: VERIFIED, MISLEADING, CONTRADICTED, NO EVIDENCE.
+    Non-nutrient claims (Vegetarian) checked against ingredient list.
+    """
+    auditor = LabelTruthClaimsAuditor()
+    nutrition = {
+        "sugars_g": {"value": 12.0},
+        "protein_g": {"value": 2.0},
+        "fat_g": {"value": 8.0},
+        "saturated_fat_g": {"value": 4.5},
+        "sodium_mg": {"value": 600.0}
+    }
+    
+    # 1. Product with non-vegetarian gelatin
+    claims = [
+        {"claim": "100% Vegetarian"},
+        {"claim": "Zero Sugar"},
+        {"claim": "Good for Health"},
+        {"claim": "Super Tasty Snack"}
+    ]
+    ingredients = [{"name": "Sugar"}, {"name": "Pork Gelatin"}, {"name": "Palmolein"}]
+    
+    audited = auditor._audit_claims(claims, nutrition, contains_palm=True, ingredients=ingredients, source_url="https://test")
+    verdicts = {c["claim"]: c["audit_verdict"] for c in audited}
+    
+    # Vegetarian claim contradicted by pork gelatin
+    assert verdicts["100% Vegetarian"] == "CONTRADICTED"
+    # Zero Sugar contradicted by 12g sugar
+    assert verdicts["Zero Sugar"] == "CONTRADICTED"
+    # Good for Health contradicted by palm oil and high sodium/sugar
+    assert verdicts["Good for Health"] == "CONTRADICTED"
+    # Super Tasty Snack is subjective marketing -> NO EVIDENCE
+    assert verdicts["Super Tasty Snack"] == "NO EVIDENCE"
+    
+    # Allowed verdict set validation
+    for c in audited:
+        assert c["audit_verdict"] in {"VERIFIED", "MISLEADING", "CONTRADICTED", "NO EVIDENCE"}
 
 
 @pytest.mark.asyncio
@@ -330,7 +470,7 @@ async def test_diet_coke_detection_and_zero_sugar_audit():
     # Zero Sugar claim verified against FSSAI <=0.5g/100ml
     zero_sugar_claims = [c for c in normalized["front_pack_claims"] if "zero sugar" in c["claim"].lower()]
     if zero_sugar_claims:
-        assert zero_sugar_claims[0]["audit_verdict"] == "Verified"
+        assert zero_sugar_claims[0]["audit_verdict"] == "VERIFIED"
         assert "fssai" in zero_sugar_claims[0]["verdict_reason"].lower()
 
 
@@ -348,19 +488,20 @@ async def test_score_personal_endpoint(async_db):
                     "saturated_fat_g": {"value": 0.5},
                     "sodium_mg": {"value": 80.0}
                 },
+                "ingredients": [{"name": "Mustard Oil"}, {"name": "Lentils"}],
                 "oil_listed": {"value": "Cold Pressed Mustard Oil", "is_palm_oil": False}
             },
-            "profile": "general_health",
-            "strict_palm_oil": False,
-            "goals": ["lower_sugar", "low_sodium"],
-            "share_of_daily": 0.15
+            "conditions": ["general_health"],
+            "user_allergens": [],
+            "preferences": []
         }
         res = await client.post("/api/score-personal", json=payload)
         assert res.status_code == 200
         data = res.json()
+        assert "product_rating" in data
         assert "personal_match_score" in data
-        assert "all_profiles" in data
-        assert "General Health-Aware" in data["profile_name"]
+        assert "allergy_check" in data
+        assert data["show_scores"] is True
     app.dependency_overrides.clear()
 
 

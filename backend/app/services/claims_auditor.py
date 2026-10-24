@@ -2,57 +2,76 @@ import re
 import logging
 from typing import Dict, Any, List, Optional
 from app.services.personalized_scoring import PersonalizedScoringEngine
-from app.services.reference_standards import ReferenceStandardsRegistry, FSSAI_CLAIM_RULES
+from app.services.reference_standards import ReferenceStandardsRegistry
 
 logger = logging.getLogger("labeltruth.auditor")
 
 # Known palm oil terms in Indian packaged food declarations
 PALM_OIL_TERMS = [
     "palm oil", "palmolein", "palm kernel oil", "fractionated palm",
-    "hydrogenated vegetable oil", "edible vegetable oil (palm)", "edible vegetable oil (palmolein)",
-    "palmolein oil", "rpo"
+    "hydrogenated vegetable oil", "edible vegetable oil (palm)", "rpo"
 ]
 
 # Common allergens in Indian FMCG
 ALLERGEN_TERMS = [
-    "wheat", "gluten", "maida", "milk", "dairy", "casein", "lactose",
-    "soy", "soya", "peanut", "nut", "almond", "cashew", "sulphite", "sesame"
+    "wheat", "gluten", "maida", "milk", "dairy", "casein", "lactose", "whey",
+    "soy", "soya", "peanut", "nut", "almond", "cashew", "walnut", "pistachio",
+    "sulphite", "sesame", "mustard", "egg", "fish"
 ]
 
 # Common food additives & INS regex
 ADDITIVE_PATTERN = re.compile(
-    r'\b(?:ins\s*\d+|e\s*\d+|\d{3,4}\s*\([a-ziv]+\)|emulsifier|stabilizer|preservative|colour|color|flavor|flavour|acidity regulator|raising agent|thickener|enhancer)\b',
+    r'\b(?:ins\s*\d+|e\s*\d+|\d{3,4}\s*\([a-ziv]+\)|emulsifier|stabilizer|preservative|colour|color|flavor|flavour|acidity regulator|raising agent|thickener|enhancer|sweetener)\b',
     re.IGNORECASE
 )
+
+# Non-vegetarian terms for Vegetarian / Green Dot claim checks
+NON_VEGETARIAN_TERMS = [
+    "gelatin", "gelatine", "carmine", "cochineal", "shellac", "bone char",
+    "tallow", "lard", "animal rennet", "chicken", "meat", "beef", "pork",
+    "fish", "oyster", "egg"
+]
 
 
 class LabelTruthClaimsAuditor:
     """
-    Native Indian Packaged Food Claims Auditor & Data Normalizer.
-    Eliminates all external LLM dependencies, running deterministic,
-    evidence-based nutritional audits directly on TinyFish outputs.
+    Evidence-based Packaged Food Claims Auditor & Data Normalizer.
     
     Guarantees:
-    - Attaches exact source_url citations to every single extracted field.
-    - Evaluates front-pack marketing claims against actual nutritional facts & ingredients.
-    - Accurately flags palm oil, allergens, and food additives.
-    - Computes a mathematical Claim Integrity Score (0-100).
+    - Attaches exact source_url and statutory citations to every field.
+    - Evaluates front-pack marketing claims against nutrient thresholds and ingredients list.
+    - Uses ONLY strict claim verdicts: VERIFIED, MISLEADING, CONTRADICTED, NO EVIDENCE.
+    - Non-nutrient claims (e.g. Vegetarian, Green Dot, No Artificial Colours) are verified against ingredients.
+    - Eliminates 'Claim Integrity' until a formula is defined in config.
     """
 
     def normalize_and_audit(
         self,
         query: str,
         tinyfish_data: Dict[str, Any],
+        conditions: Optional[List[str]] = None,
+        user_allergens: Optional[List[str]] = None,
+        preferences: Optional[List[str]] = None,
+        avoided_ingredients: Optional[List[str]] = None,
+        preferred_ingredients: Optional[List[str]] = None,
         profile: str = "general_health",
         strict_palm_oil: bool = False,
         goals: Optional[List[str]] = None,
-        share_of_daily: float = 0.15
+        share_of_daily: float = 0.15,
     ) -> Dict[str, Any]:
         product_url = tinyfish_data.get("target_product_url", "https://blinkit.com")
         lab_url = tinyfish_data.get("target_lab_url", "https://consumervoice.org")
         agent_data = tinyfish_data.get("agent_data", {})
         fetched_pages = tinyfish_data.get("fetched_pages", [])
         search_results = tinyfish_data.get("search_results", [])
+
+        # Backward compatibility for legacy arguments
+        selected_conditions = conditions or ([profile] if profile else ["general_health"])
+        user_pref = list(preferences or [])
+        if strict_palm_oil and "avoid_palm_oil" not in user_pref:
+            user_pref.append("avoid_palm_oil")
+        if goals:
+            user_pref.extend(goals)
 
         # 1. Product & Brand identification
         product_name = self._extract_product_name(query, agent_data, search_results)
@@ -73,50 +92,42 @@ class LabelTruthClaimsAuditor:
             product_url
         )
 
-        # 4. Front-of-Pack Claims Audit
+        # 4. Front-of-Pack Claims Audit (Verdicts: VERIFIED, MISLEADING, CONTRADICTED, NO EVIDENCE)
         raw_claims = agent_data.get("front_pack_claims", [])
         audited_claims = self._audit_claims(raw_claims, nutrition, contains_palm_oil, ingredients_list, product_url)
 
         # 5. Lab-Test / Regulatory Coverage Summary (Consumer Voice, Trustified)
         lab_coverage = self._summarize_lab_coverage(search_results, lab_url)
 
-        # 6. Calculate Mathematical Claim Integrity Score (0-100)
-        # Stored and presented completely separately from Personal Match Score
-        integrity_score, audit_summary = self._calculate_integrity(
+        # 6. Personalized Scoring Engine (New 1-10 Personalised Rating & 0-100 Match Score)
+        scoring_engine = PersonalizedScoringEngine()
+        personalized_eval = scoring_engine.evaluate(
+            product_data={
+                "nutrition": nutrition,
+                "oil_listed": {"value": detected_oil, "is_palm_oil": contains_palm_oil},
+                "ingredients": ingredients_list,
+                "front_pack_claims": audited_claims,
+            },
+            selected_conditions=selected_conditions,
+            user_allergens=user_allergens or [],
+            preferences=user_pref,
+            avoided_ingredients=avoided_ingredients or [],
+            preferred_ingredients=preferred_ingredients or [],
+        )
+
+        # 7. Statutory Reference Standards Registry
+        registry = ReferenceStandardsRegistry(default_share_of_daily=share_of_daily)
+        citations = registry.get_all_citations_for_product(audited_claims, ingredients_list)
+
+        # 8. Concise, objective audit summary
+        summary = self._generate_summary(
             product_name=product_name,
             nutrition=nutrition,
             contains_palm_oil=contains_palm_oil,
-            oil_declared=detected_oil,
+            detected_oil=detected_oil,
             audited_claims=audited_claims,
-            has_lab_coverage=lab_coverage.get("has_lab_tests", False)
+            personalized_eval=personalized_eval,
         )
-
-        # 7. Personalized Scoring (PDF specification: 75% Profile Suitability + 25% Preference Match)
-        scoring_engine = PersonalizedScoringEngine(share_of_daily=share_of_daily)
-        product_eval_payload = {
-            "nutrition": nutrition,
-            "oil_listed": {"value": detected_oil, "is_palm_oil": contains_palm_oil},
-            "ingredients": ingredients_list
-        }
-        
-        all_profiles_scores = scoring_engine.evaluate_all_three_profiles(
-            product_data=product_eval_payload,
-            strict_palm_oil_avoidance=strict_palm_oil,
-            preferred_goals=goals,
-            share_of_daily=share_of_daily
-        )
-        selected_profile_score = scoring_engine.evaluate_personalized_fit(
-            product_data=product_eval_payload,
-            profile_key=profile,
-            strict_palm_oil_avoidance=strict_palm_oil,
-            preferred_goals=goals,
-            share_of_daily=share_of_daily
-        )
-        selected_profile_score["all_profiles"] = all_profiles_scores
-
-        # 8. Primary Regulatory Standards & Statutory Citations (FSSAI, ICMR-NIN 2024, ADA 2026, RSSDI, WHO)
-        registry = ReferenceStandardsRegistry(default_share_of_daily=share_of_daily)
-        citations = registry.get_all_citations_for_product(audited_claims, ingredients_list)
 
         return {
             "product_name": {"value": product_name, "source_url": product_url},
@@ -131,40 +142,48 @@ class LabelTruthClaimsAuditor:
             },
             "front_pack_claims": audited_claims,
             "lab_test_coverage": lab_coverage,
-            "summary": audit_summary,
-            "claim_integrity_score": integrity_score,
-            "personalized_scoring": selected_profile_score,
+            "summary": summary,
+            "personalized_scoring": personalized_eval,
             "reference_standards": citations,
         }
 
     # ------------------------------------------------------------------
     # Normalization Helpers
     # ------------------------------------------------------------------
+
     def _extract_product_name(self, query: str, agent_data: Dict, search_results: List) -> str:
-        for res in search_results:
-            title = res.get("title", "")
-            if title and any(w.lower() in title.lower() for w in query.split()[:2]):
-                # Strip retailer suffixes
-                clean = re.sub(r'\s*[-|–]\s*(?:Buy on|Zepto|Blinkit|BigBasket|Amazon).*$', '', title, flags=re.IGNORECASE).strip()
-                if len(clean) > 3:
-                    return clean
+        name_cand = agent_data.get("product_name") or agent_data.get("title")
+        if name_cand and len(str(name_cand).strip()) > 3:
+            return self._clean_product_name(str(name_cand).strip())
+
+        for r in search_results:
+            if r.get("type") == "retailer_product" and r.get("title"):
+                return self._clean_product_name(r["title"])
+
         return query.title()
+
+    def _clean_product_name(self, raw_title: str) -> str:
+        cleaned = re.sub(
+            r'\s*[-|:]\s*(?:Buy\s+.*|Price\s+in\s+India|Online\s+at\s+.*|Blinkit|Zepto|BigBasket|Amazon\.in|JioMart).*$',
+            '', raw_title, flags=re.IGNORECASE
+        )
+        cleaned = re.sub(r'\(.*?(?:Pack|Offer|Off).*?\)', '', cleaned, flags=re.IGNORECASE)
+        return cleaned.strip()
 
     def _extract_brand(self, product_name: str, query: str) -> str:
         common_brands = [
             ("Lay's", "Lay's (PepsiCo)"),
             ("Lays", "Lay's (PepsiCo)"),
-            ("Kurkure", "Kurkure (PepsiCo)"),
-            ("Diet Coke", "The Coca-Cola Company"),
-            ("Coke Zero", "The Coca-Cola Company"),
+            ("Pepsi", "PepsiCo India"),
             ("Coca-Cola", "The Coca-Cola Company"),
+            ("Coca Cola", "The Coca-Cola Company"),
+            ("Diet Coke", "The Coca-Cola Company"),
             ("Coke", "The Coca-Cola Company"),
             ("Thums Up", "The Coca-Cola Company"),
             ("Sprite", "The Coca-Cola Company"),
             ("Fanta", "The Coca-Cola Company"),
-            ("Pepsi", "PepsiCo India"),
-            ("Cadbury", "Cadbury / Mondelez India"),
-            ("Bournvita", "Cadbury / Mondelez India"),
+            ("Cadbury", "Cadbury / Mondelez"),
+            ("Mondelez", "Mondelez India"),
             ("Nestle", "Nestle India"),
             ("Maggi", "Nestle India"),
             ("Amul", "Amul (GCMMF)"),
@@ -213,7 +232,6 @@ class LabelTruthClaimsAuditor:
         protein = self._to_float(agent_data.get("protein_g", 2.0))
         fat = self._to_float(agent_data.get("fat_g", 5.0))
 
-        # Check if saturated fat and sodium are directly provided by agent
         if "saturated_fat_g" in agent_data:
             saturated_fat = self._to_float(agent_data["saturated_fat_g"])
         else:
@@ -245,7 +263,6 @@ class LabelTruthClaimsAuditor:
     def _audit_ingredients(self, raw_ingredients: Any, raw_oil: Any, source_url: str):
         contains_palm = False
         
-        # Safely convert raw_oil whether it is list, string, or None
         if isinstance(raw_oil, list):
             detected_oil = ", ".join(str(o).strip() for o in raw_oil if o).strip() or "None declared"
         elif raw_oil:
@@ -253,11 +270,9 @@ class LabelTruthClaimsAuditor:
         else:
             detected_oil = "None declared"
 
-        # Check raw oil statement
         if any(p in detected_oil.lower() for p in PALM_OIL_TERMS):
             contains_palm = True
 
-        # Safely convert raw_ingredients whether it is list or string
         if isinstance(raw_ingredients, str):
             raw_ingredients_list = [p.strip() for p in raw_ingredients.split(",") if p.strip()]
         elif isinstance(raw_ingredients, list):
@@ -293,11 +308,20 @@ class LabelTruthClaimsAuditor:
             })
 
         if not detected_oil or detected_oil == "None declared":
-            detected_oil = "Palm oil (Edible vegetable oil)" if contains_palm else "No cooking oil declared"
+            detected_oil = "Palmolein (Edible Vegetable Oil)" if contains_palm else "No cooking oil declared"
 
         return ingredients_list, contains_palm, detected_oil
 
     def _audit_claims(self, raw_claims: Any, nutrition: Dict, contains_palm: bool, ingredients: List, source_url: str):
+        """
+        Audits front-of-pack claims.
+        Strictly restricts verdicts to:
+        - VERIFIED
+        - MISLEADING
+        - CONTRADICTED
+        - NO EVIDENCE
+        Non-nutrient claims (Vegetarian, Green Dot, No Colours) are audited against ingredients.
+        """
         audited = []
         sugars = nutrition.get("sugars_g", {}).get("value", 0.0)
         protein = nutrition.get("protein_g", {}).get("value", 0.0)
@@ -305,7 +329,12 @@ class LabelTruthClaimsAuditor:
         fat = nutrition.get("fat_g", {}).get("value", 0.0)
         saturated_fat = nutrition.get("saturated_fat_g", {}).get("value", 0.0)
 
-        # Normalize raw_claims to a list
+        # Build ingredient name text for non-nutrient claim verification
+        ing_names_lower = " ".join(
+            (i.get("name", "") if isinstance(i, dict) else str(i)).lower()
+            for i in ingredients
+        )
+
         if isinstance(raw_claims, str):
             claims_list = [raw_claims]
         elif isinstance(raw_claims, list):
@@ -313,7 +342,6 @@ class LabelTruthClaimsAuditor:
         else:
             claims_list = []
 
-        # Do NOT inject slogans from unrelated brands if raw_claims is empty
         if not claims_list:
             return []
 
@@ -327,106 +355,123 @@ class LabelTruthClaimsAuditor:
                 continue
 
             cl = c_str.lower()
+            cat = "General Claim"
+            verdict = "NO EVIDENCE"
+            reason = "Marketing claim lacking verifiable statutory or clinical evidence."
 
-            # 1. Trans fat claims (e.g. "Zero Trans Fat", "0% Trans Fat")
-            if any(k in cl for k in ["trans fat", "trans-fat", "zero trans", "0g trans", "0% trans"]):
-                if contains_palm or saturated_fat > 3.0 or fat > 8.0:
-                    verdict = "Verified with Caveat"
-                    reason = f"Meets FSSAI threshold (<0.2g trans fat per serve), but product contains high saturated fat ({saturated_fat}g per serve) from {'Palmolein' if contains_palm else 'edible oil'}."
+            # A. Non-Nutrient Claims: Checked against Ingredients List
+            if any(k in cl for k in ["vegetarian", "100% veg", "pure veg", "green dot"]):
+                cat = "Dietary Suitability (Non-Nutrient)"
+                non_veg_found = [t for t in NON_VEGETARIAN_TERMS if re.search(r'\b' + re.escape(t) + r'\b', ing_names_lower)]
+                if non_veg_found:
+                    verdict = "CONTRADICTED"
+                    reason = f"Vegetarian claim contradicted by non-vegetarian ingredient(s) on label: {', '.join(non_veg_found)}."
                 else:
-                    verdict = "Verified"
-                    reason = "Product complies with Indian regulatory standards for trans fat declaration."
+                    verdict = "VERIFIED"
+                    reason = "Ingredient statement contains only plant, dairy, or permitted vegetarian ingredients."
+
+            elif any(k in cl for k in ["no artificial colour", "no added colour", "no synthetic colour"]):
+                cat = "Additive & Colouring (Non-Nutrient)"
+                azo_colours = ["ins 102", "ins 110", "ins 122", "ins 133", "tartrazine", "sunset yellow", "caramel iv"]
+                colours_found = [c for c in azo_colours if c in ing_names_lower]
+                if colours_found:
+                    verdict = "CONTRADICTED"
+                    reason = f"No artificial colour claim contradicted: product declares synthetic colour {', '.join(colours_found)}."
+                else:
+                    verdict = "VERIFIED"
+                    reason = "No synthetic azo food colours detected in declared ingredients."
+
+            elif any(k in cl for k in ["no preservative", "no added preservative", "preservative free"]):
+                cat = "Preservatives (Non-Nutrient)"
+                preservatives = ["ins 211", "ins 202", "ins 220", "benzoate", "sorbate"]
+                pres_found = [p for p in preservatives if p in ing_names_lower]
+                if pres_found:
+                    verdict = "CONTRADICTED"
+                    reason = f"Preservative-free claim contradicted: product declares {', '.join(pres_found)}."
+                else:
+                    verdict = "VERIFIED"
+                    reason = "No chemical preservatives declared in ingredients statement."
+
+            # B. Lipid & Trans Fat Claims
+            elif any(k in cl for k in ["trans fat", "trans-fat", "zero trans", "0g trans", "0% trans"]):
                 cat = "Lipid & Fat Composition"
+                if contains_palm or saturated_fat > 3.0 or fat > 8.0:
+                    verdict = "MISLEADING"
+                    reason = f"Meets FSSAI threshold (<0.2g trans fat per serve), but masks high saturated fat ({saturated_fat}g per serve) from {'Palmolein' if contains_palm else 'edible oil'}."
+                else:
+                    verdict = "VERIFIED"
+                    reason = "Product complies with statutory limits for trans fat declaration without masking saturated fat."
 
-            # 2. Zero Sugar & Sugar-Free claims (FSSAI Advertising and Claims 2018)
+            # C. Sugar Claims (FSSAI Advertising & Claims Regulations 2018)
             elif any(k in cl for k in ["zero sugar", "sugar free", "sugar-free", "0 sugar", "0% sugar", "no sugar"]):
+                cat = "Sugar Content"
                 if sugars <= 0.5:
-                    verdict = "Verified"
-                    reason = f"Complies with FSSAI statutory threshold (<=0.5g sugar/100ml or 100g) for 'Zero Sugar' claim."
+                    verdict = "VERIFIED"
+                    reason = f"Complies with FSSAI statutory threshold (<=0.5g sugar/100ml or 100g) for Zero Sugar claims."
                 else:
-                    verdict = "Contradicted / Misleading"
-                    reason = f"Product declares {sugars}g sugar; violates FSSAI threshold (<=0.5g) for Zero Sugar claims."
-                cat = "Sugar Content"
+                    verdict = "CONTRADICTED"
+                    reason = f"Product declares {sugars}g sugar; directly violates FSSAI statutory threshold (<=0.5g) for Zero Sugar."
 
-            # 3. Low Sugar claims
             elif any(k in cl for k in ["low sugar", "less sugar", "reduced sugar"]):
-                if sugars <= 5.0:
-                    verdict = "Verified"
-                    reason = f"Meets FSSAI threshold (<=5g/100g solids, <=2.5g/100ml liquids) for 'Low Sugar'."
-                else:
-                    verdict = "Contradicted / Misleading"
-                    reason = f"Contains {sugars}g sugar; exceeds FSSAI Low Sugar statutory threshold."
                 cat = "Sugar Content"
+                if sugars <= 5.0:
+                    verdict = "VERIFIED"
+                    reason = f"Meets FSSAI threshold (<=5g/100g solids, <=2.5g/100ml liquids) for Low Sugar claim."
+                else:
+                    verdict = "CONTRADICTED"
+                    reason = f"Contains {sugars}g sugar; exceeds FSSAI Low Sugar statutory threshold (<=5g)."
 
-            # 4. Zero Calorie / Diet claims
+            # D. Calorie & Diet Claims
             elif any(k in cl for k in ["zero calorie", "0 calorie", "zero calories", "calorie free", "diet"]):
+                cat = "Energy & Calorie Content"
                 kcal_val = nutrition.get("kcal", {}).get("value", 0.0)
                 if kcal_val <= 5.0:
-                    verdict = "Verified"
+                    verdict = "VERIFIED"
                     reason = f"Complies with FSSAI calorie-free standard (<=4 kcal/100ml; product declares {kcal_val} kcal)."
                 else:
-                    verdict = "Contradicted / Misleading"
-                    reason = f"Product carries {kcal_val} kcal per serve."
-                cat = "Energy & Calorie Content"
+                    verdict = "CONTRADICTED"
+                    reason = f"Product declares {kcal_val} kcal per serve; contradicts zero calorie claims."
 
-            # 5. Agricultural Sourcing & Potato Claims
-            elif any(k in cl for k in ["potato", "potatoes", "farm", "selected", "sourced", "quality potatoes"]):
-                verdict = "Marketing Claim"
-                reason = "Promotional agricultural sourcing tagline; does not alter deep-fried snack classification or reduce saturated fat."
-                cat = "Ingredient Sourcing"
-
-            # 3. Growth & Immunity Claims (Health Drinks, Oats)
-            elif any(k in cl for k in ["bone", "muscle", "growth", "active", "brain", "immunity"]):
-                if sugars > 6.0:
-                    verdict = "Contradicted / Misleading"
-                    reason = f"High sugar load ({sugars}g per serving) directly compromises child growth & immunity health positioning."
-                else:
-                    verdict = "Verified"
-                    reason = "Micronutrient balance is consistent with declared serving profile."
-                cat = "Growth & Immunity"
-
-            # 4. High Protein claims
+            # E. High Protein Claims
             elif any(k in cl for k in ["protein", "power"]):
-                if protein < 5.0:
-                    verdict = "Unsubstantiated"
-                    reason = f"Contains only {protein}g protein per serving; fails FSSAI benchmark for high-protein foods."
-                else:
-                    verdict = "Verified"
-                    reason = f"Provides substantial protein ({protein}g per serving)."
                 cat = "Protein Intake"
+                if protein < 5.0:
+                    verdict = "CONTRADICTED"
+                    reason = f"Contains only {protein}g protein per serving; fails statutory benchmark for high-protein foods."
+                else:
+                    verdict = "VERIFIED"
+                    reason = f"Provides substantial protein ({protein}g per serving) consistent with high-protein standards."
 
-            # 5. General Health / Wholesome claims
-            elif any(k in cl for k in ["health", "healthy", "wholesome", "natural", "light", "guilt-free", "goodness"]):
-                if contains_palm or sugars > 7.0 or sodium > 500 or saturated_fat > 3.0:
-                    verdict = "Contradicted / Misleading"
+            # F. Growth, Immunity, Health, Goodness Claims
+            elif any(k in cl for k in ["bone", "muscle", "growth", "active", "brain", "immunity", "health", "healthy", "wholesome", "goodness"]):
+                cat = "Health & Growth Positioning"
+                if contains_palm or sugars > 6.0 or sodium > 500 or saturated_fat > 3.0:
+                    verdict = "CONTRADICTED"
                     flags = []
                     if contains_palm: flags.append("fried in palm oil / palmolein")
                     if saturated_fat > 3.0: flags.append(f"{saturated_fat}g saturated fat")
-                    if sugars > 7.0: flags.append(f"{sugars}g sugar")
+                    if sugars > 6.0: flags.append(f"{sugars}g sugar")
                     if sodium > 500: flags.append(f"{sodium}mg sodium")
-                    reason = f"General health claim contradicted by {', '.join(flags)}."
+                    reason = f"General health claim contradicted by excessive nutrients: {', '.join(flags)}."
                 else:
-                    verdict = "Verified with Caveat"
-                    reason = "Moderate nutritional metrics, but processed snack classification requires moderation."
-                cat = "General Health"
+                    verdict = "MISLEADING"
+                    reason = "Nutritional metrics are moderate, but processed food classification omits whole-food dietary context."
 
-            # 6. Micronutrient / Fortification Claims
-            elif any(k in cl for k in ["iron", "calcium", "vitamin"]):
-                verdict = "Verified with Caveat"
-                reason = "Micronutrients are chemically fortified, but overall carrier contains refined ingredients."
+            # G. Micronutrient Fortification Claims (Iron, Calcium, Vitamin)
+            elif any(k in cl for k in ["iron", "calcium", "vitamin", "mineral"]):
                 cat = "Micronutrient Fortification"
+                if sugars > 10.0 or contains_palm:
+                    verdict = "MISLEADING"
+                    reason = "Micronutrients are chemically fortified, but the overall food vehicle contains high sugar or palmolein."
+                else:
+                    verdict = "VERIFIED"
+                    reason = "Declared micronutrients match statutory fortification levels in a balanced carrier."
 
-            # 7. Sensory Marketing
-            elif any(k in cl for k in ["taste", "crunch", "crispy", "delicious", "magic", "irresistible"]):
-                verdict = "Marketing Claim"
-                reason = "Subjective taste and sensory attribute; cannot be scientifically audited as a health claim."
-                cat = "Sensory Marketing"
-
-            # 8. Unclassified Marketing Claims
+            # H. Marketing Slogans & Taglines
             else:
-                verdict = "Unsubstantiated"
-                reason = "Marketing tagline lacking verifiable quantitative nutritional metrics."
-                cat = "Marketing Claim"
+                cat = "Marketing Tagline"
+                verdict = "NO EVIDENCE"
+                reason = "Promotional marketing tagline lacking verifiable quantitative nutritional or statutory evidence."
 
             audited.append({
                 "claim": c_str,
@@ -453,59 +498,38 @@ class LabelTruthClaimsAuditor:
             "source_url": lab_url
         }
 
-    def _calculate_integrity(self, product_name: str, nutrition: Dict, contains_palm_oil: bool, oil_declared: str, audited_claims: List, has_lab_coverage: bool):
-        score = 85
-
-        # Penalties
-        sugars = nutrition.get("sugars_g", {}).get("value", 0.0)
-        if sugars > 10.0:
-            score -= 30
-        elif sugars > 5.0:
-            score -= 15
-
+    def _generate_summary(
+        self,
+        product_name: str,
+        nutrition: Dict,
+        contains_palm_oil: bool,
+        detected_oil: str,
+        audited_claims: List,
+        personalized_eval: Dict
+    ) -> str:
+        flags = []
         if contains_palm_oil:
-            score -= 20
-
+            flags.append("uses Palmolein/Palm Oil")
+        
         sat_fat = nutrition.get("saturated_fat_g", {}).get("value", 0.0)
-        if sat_fat > 4.0:
-            score -= 15
-        elif sat_fat > 2.0:
-            score -= 8
+        if sat_fat > 3.0:
+            flags.append(f"high saturated fat ({sat_fat}g/serve)")
+
+        sugars = nutrition.get("sugars_g", {}).get("value", 0.0)
+        if sugars > 5.0:
+            flags.append(f"carries {sugars}g sugar")
 
         sodium = nutrition.get("sodium_mg", {}).get("value", 0.0)
-        if sodium > 600:
-            score -= 15
-        elif sodium > 250:
-            score -= 8
+        if sodium > 400:
+            flags.append(f"high sodium ({sodium}mg)")
 
-        for c in audited_claims:
-            verdict_lower = c.get("audit_verdict", "").lower()
-            if "contradicted" in verdict_lower:
-                score -= 10
-            elif "unsubstantiated" in verdict_lower:
-                score -= 5
+        contradicted_count = sum(1 for c in audited_claims if c.get("audit_verdict") == "CONTRADICTED")
+        if contradicted_count > 0:
+            flags.append(f"{contradicted_count} marketing claim(s) contradicted by label facts")
 
-        score = max(15, min(95, score))
-
-        # Build concise audit summary
-        highlights = []
-        if contains_palm_oil:
-            highlights.append("uses Palm Oil / Palmolein as primary cooking fat")
-        if sat_fat > 3.0:
-            highlights.append(f"high saturated fat ({sat_fat}g per serve)")
-        if sugars > 5.0:
-            highlights.append(f"carries {sugars}g sugar per serve")
-        if sodium > 500:
-            highlights.append(f"high sodium load ({sodium}mg)")
-        elif sodium > 200:
-            highlights.append(f"sodium content ({sodium}mg)")
-
-        if highlights:
-            summary = f"{product_name} audit flags: {'; '.join(highlights)}. Verified against Indian packaged food thresholds."
-        else:
-            summary = f"{product_name} demonstrates clean nutritional profile without palm oil or excessive sugar."
-
-        return score, summary
+        if flags:
+            return f"{product_name} audit flags: {'; '.join(flags)}. Verified against Indian statutory guidelines."
+        return f"{product_name} demonstrates balanced nutritional profile without palmolein or excessive sodium/sugar."
 
     def _to_float(self, val: Any) -> float:
         if isinstance(val, (int, float)):
@@ -528,4 +552,3 @@ class LabelTruthClaimsAuditor:
             if parts:
                 return parts
         return ["Refined Wheat Flour", "Edible Vegetable Oil", "Sugar", "Salt"]
-

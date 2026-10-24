@@ -16,7 +16,6 @@ export default function ProductCard({ data }) {
     front_pack_claims = [],
     lab_test_coverage,
     summary,
-    claim_integrity_score = 50,
     personalized_scoring,
     reference_standards = [],
   } = data;
@@ -24,16 +23,17 @@ export default function ProductCard({ data }) {
   const isPalmOil = oil_listed?.is_palm_oil || false;
 
   const getVerdictClass = (verdict) => {
-    const v = (verdict || '').toLowerCase();
-    if (v.includes('contradicted') || v.includes('misleading')) return 'contradicted';
-    if (v.includes('verified')) return 'verified';
-    return 'unsubstantiated';
+    const v = (verdict || '').toUpperCase();
+    if (v.includes('CONTRADICTED')) return 'contradicted';
+    if (v.includes('MISLEADING')) return 'misleading';
+    if (v.includes('VERIFIED')) return 'verified';
+    return 'no-evidence';
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* =========================================
-          TOP: Personalized Scoring Engine (PDF Spec)
+          TOP: Personalized Rating & Match Score Engine
          ========================================= */}
       <PersonalizedScoringSection
         productData={data}
@@ -65,12 +65,6 @@ export default function ProductCard({ data }) {
                   <span>View Product Listing</span>
                 </a>
               )}
-            </div>
-
-            {/* Claim Integrity Score Block (Kept strictly separate from Personal Match) */}
-            <div className="score-badge-box" title="Independent mathematical score of packaging claim truthfulness against label facts">
-              <span className="score-number">{claim_integrity_score}</span>
-              <span className="score-label">Claim Integrity</span>
             </div>
           </div>
 

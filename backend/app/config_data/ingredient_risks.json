@@ -1,0 +1,89 @@
+{
+  "ingredient_rules": [
+    {
+      "pattern": "hydrogenated|partially hydrogenated|vanaspati|trans fat|trans-fat",
+      "risk_score": 10,
+      "flagged": true,
+      "category": "Industrial Trans Fat",
+      "reason": "Industrial hydrogenated vegetable fats carry severe coronary heart disease risk and are strictly restricted (<0.2% trans fat) under FSSAI regulations.",
+      "source_name": "FSSAI (Food Safety and Standards - Prohibition and Restrictions on Sales) Regulations",
+      "source_url": "https://www.fssai.gov.in",
+      "access_date": "2026-10-24",
+      "statutory_status": "Statutory Gazette Prohibition"
+    },
+    {
+      "pattern": "palmolein|palm oil|fractionated palm|palm kernel|edible vegetable oil \\(palm\\)",
+      "risk_score": 8,
+      "flagged": true,
+      "category": "High Saturated Tropical Fat",
+      "reason": "Palmolein contains ~45-50% saturated fatty acids (palmitic acid); flagged as primary frying fat contributor to HFSS classification in Indian snacks.",
+      "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
+      "source_url": "https://www.nin.res.in",
+      "access_date": "2026-10-24",
+      "statutory_status": "Official Dietary Guideline"
+    },
+    {
+      "pattern": "high fructose corn syrup|hfcs|liquid glucose|invert sugar syrup",
+      "risk_score": 8,
+      "flagged": true,
+      "category": "Refined Free Sugar Concentrate",
+      "reason": "Refined concentrated industrial sugar syrup promotes rapid hepatic de novo lipogenesis and insulin resistance.",
+      "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024 & WHO Guideline: Sugars intake for adults and children",
+      "source_url": "https://www.who.int",
+      "access_date": "2026-10-24",
+      "statutory_status": "Official Dietary Guideline"
+    },
+    {
+      "pattern": "aspartame|acesulfame|acesulfame potassium|sucralose|saccharin|neotame",
+      "risk_score": 6,
+      "flagged": true,
+      "category": "Artificial / Non-Nutritive Sweetener",
+      "reason": "Intense artificial sweeteners require mandatory front-pack statutory disclosure under FSSAI (Labelling and Display) Regulations 2020.",
+      "source_name": "FSSAI Gazette Notification: Labelling and Display Regulations 2020",
+      "source_url": "https://www.fssai.gov.in/upload/notifications/2020/12/5fd87c6a0f6adGazette_Notification_Labelling_Display_14_12_2020.pdf",
+      "access_date": "2026-10-24",
+      "statutory_status": "Statutory Gazette Mandate"
+    },
+    {
+      "pattern": "ins 102|ins 110|ins 122|ins 124|ins 133|tartrazine|sunset yellow|allura red|ponceau 4r|caramel iv",
+      "risk_score": 6,
+      "flagged": true,
+      "category": "Synthetic Azo Food Colour",
+      "reason": "Synthetic food colours subject to maximum permitted levels (100 mg/kg) under FSSAI standards and EU warning requirements.",
+      "source_name": "FSSAI Food Additives Standards & EFSA Safety Opinions",
+      "source_url": "https://www.efsa.europa.eu",
+      "access_date": "2026-10-24",
+      "statutory_status": "Official Safety Opinion"
+    },
+    {
+      "pattern": "ins 621|ins 627|ins 631|ins 635|monosodium glutamate|flavour enhancer",
+      "risk_score": 5,
+      "flagged": true,
+      "category": "Synthetic Flavour Enhancer",
+      "reason": "Purified glutamates and ribonucleotides enhance sodium palatability, masking elevated sodium content in ultra-processed snacks.",
+      "source_name": "FSSAI Food Additives Regulations",
+      "source_url": "https://www.fssai.gov.in",
+      "access_date": "2026-10-24",
+      "statutory_status": "Statutory Food Standard"
+    },
+    {
+      "pattern": "ins 211|ins 202|ins 220|sodium benzoate|potassium sorbate|sulphur dioxide",
+      "risk_score": 5,
+      "flagged": true,
+      "category": "Chemical Preservative",
+      "reason": "Synthetic antimicrobial preservatives requiring statutory limit compliance under FSSAI Table 1.",
+      "source_name": "FSSAI (Food Products Standards and Food Additives) Regulations",
+      "source_url": "https://www.fssai.gov.in",
+      "access_date": "2026-10-24",
+      "statutory_status": "Statutory Standard"
+    }
+  ],
+  "default_safe_risk_score": 1,
+  "undisclosed_oil_penalty": 15,
+  "avoided_ingredient_penalty": 35,
+  "preferred_ingredient_bonus": 15,
+  "contradicted_claim_penalty": 30,
+  "misleading_claim_penalty": 15,
+  "nutrient_penalty_multiplier": 2.777777778
+}
+

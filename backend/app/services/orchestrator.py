@@ -1,26 +1,24 @@
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.evidence_log import EvidenceLog
 from app.services.tinyfish_scraper import TinyFishScraperService
 from app.services.claims_auditor import LabelTruthClaimsAuditor
+from app.services.personalized_scoring import PersonalizedScoringEngine
+from app.services.reference_standards import ReferenceStandardsRegistry
 
 logger = logging.getLogger("labeltruth.orchestrator")
 
 
 class AuditOrchestrator:
     """
-    Central Orchestration Service
-    Coordinates the pipeline:
-    1. Check PostgreSQL Evidence Log cache
-    2. On Cache Miss:
-       a. Run TinyFish Scraping (Search -> Fetch -> Agent)
-       b. Run LabelTruth Claims Auditor (deterministic schema normalization & claim verification)
-       c. Persist result in PostgreSQL Evidence Log
-    3. Return final result
+    Evidence-based Audit Orchestrator.
+    Executes PostgreSQL evidence caching, TinyFish autonomous scraping,
+    claim audits, statutory citations, and the revised Personalized Rating
+    and Match Score engine.
     """
 
     def __init__(
@@ -30,12 +28,18 @@ class AuditOrchestrator:
     ):
         self.scraper = scraper_service or TinyFishScraperService()
         self.auditor = auditor_service or LabelTruthClaimsAuditor()
+        self.scoring_engine = PersonalizedScoringEngine()
 
     async def audit_product(
         self,
         session: AsyncSession,
         query: str,
         force_refresh: bool = False,
+        conditions: Optional[List[str]] = None,
+        user_allergens: Optional[List[str]] = None,
+        preferences: Optional[List[str]] = None,
+        avoided_ingredients: Optional[List[str]] = None,
+        preferred_ingredients: Optional[List[str]] = None,
         profile: str = "general_health",
         strict_palm_oil: bool = False,
         goals: Optional[list] = None,
@@ -43,6 +47,14 @@ class AuditOrchestrator:
     ) -> Dict[str, Any]:
         cleaned_query = query.strip()
         normalized_query_key = cleaned_query.lower()
+
+        # Normalize conditions and preferences
+        selected_cond = conditions or ([profile] if profile else ["general_health"])
+        user_pref = list(preferences or [])
+        if strict_palm_oil and "avoid_palm_oil" not in user_pref:
+            user_pref.append("avoid_palm_oil")
+        if goals:
+            user_pref.extend(goals)
 
         # Step 1: Cache check in PostgreSQL evidence log
         if not force_refresh:
@@ -59,36 +71,19 @@ class AuditOrchestrator:
                 logger.info(f"CACHE HIT: Returning cached evidence log #{cached_entry.id} for '{cleaned_query}'")
                 product_data = dict(cached_entry.product_data)
                 
+                # Remove legacy claim_integrity_score if present in cache
+                product_data.pop("claim_integrity_score", None)
+
                 # Dynamic personalization on cache hit
-                from app.services.personalized_scoring import PersonalizedScoringEngine
-                from app.services.reference_standards import ReferenceStandardsRegistry
-                
-                scoring_engine = PersonalizedScoringEngine(share_of_daily=share_of_daily)
-                oil_data = product_data.get("oil_listed", {})
-                contains_palm = oil_data.get("is_palm_oil", False)
-                oil_val = oil_data.get("value", "")
-                
-                eval_payload = {
-                    "nutrition": product_data.get("nutrition", {}),
-                    "oil_listed": {"value": oil_val, "is_palm_oil": contains_palm},
-                    "ingredients": product_data.get("ingredients", [])
-                }
-                
-                all_profiles = scoring_engine.evaluate_all_three_profiles(
-                    eval_payload,
-                    strict_palm_oil_avoidance=strict_palm_oil,
-                    preferred_goals=goals,
-                    share_of_daily=share_of_daily
+                personalized_eval = self.scoring_engine.evaluate(
+                    product_data=product_data,
+                    selected_conditions=selected_cond,
+                    user_allergens=user_allergens or [],
+                    preferences=user_pref,
+                    avoided_ingredients=avoided_ingredients or [],
+                    preferred_ingredients=preferred_ingredients or [],
                 )
-                selected_score = scoring_engine.evaluate_personalized_fit(
-                    eval_payload,
-                    profile_key=profile,
-                    strict_palm_oil_avoidance=strict_palm_oil,
-                    preferred_goals=goals,
-                    share_of_daily=share_of_daily
-                )
-                selected_score["all_profiles"] = all_profiles
-                product_data["personalized_scoring"] = selected_score
+                product_data["personalized_scoring"] = personalized_eval
 
                 if not product_data.get("reference_standards"):
                     registry = ReferenceStandardsRegistry(default_share_of_daily=share_of_daily)
@@ -116,11 +111,16 @@ class AuditOrchestrator:
         normalized_data = self.auditor.normalize_and_audit(
             query=cleaned_query,
             tinyfish_data=tinyfish_result,
-            profile=profile,
-            strict_palm_oil=strict_palm_oil,
-            goals=goals,
-            share_of_daily=share_of_daily
+            conditions=selected_cond,
+            user_allergens=user_allergens or [],
+            preferences=user_pref,
+            avoided_ingredients=avoided_ingredients or [],
+            preferred_ingredients=preferred_ingredients or [],
+            share_of_daily=share_of_daily,
         )
+
+        # Remove legacy claim_integrity_score if present
+        normalized_data.pop("claim_integrity_score", None)
 
         # Step 4: Persist to PostgreSQL Evidence Log
         product_name = normalized_data.get("product_name", {}).get("value")

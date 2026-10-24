@@ -5,18 +5,26 @@ from pydantic import BaseModel, Field
 class AuditRequest(BaseModel):
     query: str = Field(..., description="Product name or brand to audit", min_length=2)
     force_refresh: bool = Field(False, description="Bypass cache and force fresh web extraction")
-    profile: Optional[str] = Field("general_health", description="Selected profile: general_health, diabetes_aware, protein_conscious")
-    strict_palm_oil: Optional[bool] = Field(False, description="Strict palm oil avoidance hard exclusion toggle")
-    goals: Optional[List[str]] = Field(default_factory=list, description="User selected nutritional goals: lower_sugar, higher_protein, low_sodium, low_saturated_fat")
-    share_of_daily: Optional[float] = Field(0.15, description="Configurable share of daily allowance per serving (default: 15%)")
+    conditions: Optional[List[str]] = Field(default_factory=lambda: ["general_health"], description="List of health profiles / conditions (e.g. general_health, diabetes, hypertension, protein_conscious)")
+    profile: Optional[str] = Field("general_health", description="Selected single health condition (legacy alias)")
+    user_allergens: Optional[List[str]] = Field(default_factory=list, description="User declared allergens (e.g. peanut, milk, gluten, soy)")
+    preferences: Optional[List[str]] = Field(default_factory=list, description="User preference toggles (e.g. avoid_palm_oil, prefer_whole_grains)")
+    avoided_ingredients: Optional[List[str]] = Field(default_factory=list, description="Specific ingredients user wishes to avoid (-35 deduction)")
+    preferred_ingredients: Optional[List[str]] = Field(default_factory=list, description="Specific ingredients user prefers (+15 bonus)")
+    strict_palm_oil: Optional[bool] = Field(False, description="Legacy alias for avoiding palm oil")
+    goals: Optional[List[str]] = Field(default_factory=list, description="Legacy alias for goals")
 
 
 class PersonalizeRequest(BaseModel):
     product_data: Dict[str, Any] = Field(..., description="Audited product data dictionary")
-    profile: str = Field("general_health", description="Selected profile: general_health, diabetes_aware, protein_conscious")
-    strict_palm_oil: bool = Field(False, description="Strict palm oil avoidance hard exclusion toggle")
-    goals: List[str] = Field(default_factory=list, description="User selected nutritional goals")
-    share_of_daily: float = Field(0.15, description="Configurable share of daily allowance per serving")
+    conditions: Optional[List[str]] = Field(default_factory=lambda: ["general_health"], description="List of health profiles / conditions")
+    profile: Optional[str] = Field("general_health", description="Legacy single profile key")
+    user_allergens: Optional[List[str]] = Field(default_factory=list, description="User declared allergens")
+    preferences: Optional[List[str]] = Field(default_factory=list, description="User preferences")
+    avoided_ingredients: Optional[List[str]] = Field(default_factory=list, description="Specific ingredients to avoid")
+    preferred_ingredients: Optional[List[str]] = Field(default_factory=list, description="Specific ingredients preferred")
+    strict_palm_oil: Optional[bool] = Field(False, description="Legacy palm oil toggle")
+    goals: Optional[List[str]] = Field(default_factory=list, description="Legacy goals list")
 
 
 class ValueWithSource(BaseModel):
@@ -59,7 +67,7 @@ class OilListed(BaseModel):
 class FrontPackClaim(BaseModel):
     claim: str
     category: str
-    audit_verdict: str  # e.g., "Verified", "Contradicted / Misleading", "Unsubstantiated"
+    audit_verdict: str  # ONLY: "VERIFIED", "MISLEADING", "CONTRADICTED", "NO EVIDENCE"
     verdict_reason: str
     source_url: str
 
@@ -80,7 +88,6 @@ class ProductAuditData(BaseModel):
     front_pack_claims: List[FrontPackClaim] = []
     lab_test_coverage: LabTestCoverage = LabTestCoverage()
     summary: str
-    claim_integrity_score: int = Field(..., ge=0, le=100)
     personalized_scoring: Optional[Dict[str, Any]] = None
     reference_standards: Optional[List[Dict[str, Any]]] = None
 
@@ -104,4 +111,3 @@ class EvidenceLogItem(BaseModel):
     created_at: str
     updated_at: str
     product_data: Dict[str, Any]
-
