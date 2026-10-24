@@ -1,9 +1,22 @@
+import os
+os.environ["TESTING"] = "1"
+os.environ["TINYFISH_API_KEY"] = ""
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["FALLBACK_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
+from app.config import settings
+settings.DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+settings.FALLBACK_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+settings.TINYFISH_API_KEY = ""
+
 from app.main import app
+import app.database
+app.database._engine = None
+app.database._sessionmaker = None
 from app.database import get_db, Base
 from app.models.evidence_log import EvidenceLog
 from app.services.tinyfish_scraper import TinyFishScraperService
@@ -115,8 +128,7 @@ async def test_api_health_endpoint():
         assert data["tinyfish_api_configured"] is True
 
 
-@pytest.mark.asyncio
-async def test_image_detector_service():
+def test_image_detector_service():
     detector = ProductImageDetector()
     img = Image.new('RGB', (450, 120), color='white')
     draw = ImageDraw.Draw(img)
@@ -222,8 +234,7 @@ async def test_lays_chips_audit_and_palm_oil():
         assert "saturated fat" in trans_fat_claims[0]["verdict_reason"].lower()
 
 
-@pytest.mark.asyncio
-async def test_image_detector_lays_filename():
+def test_image_detector_lays_filename():
     detector = ProductImageDetector()
     img = Image.new('RGB', (100, 100), color='yellow')
     buf = io.BytesIO()
@@ -233,7 +244,7 @@ async def test_image_detector_lays_filename():
     result = detector.detect_product_from_bytes(buf.getvalue(), filename=filename)
     
     assert "Lays" in result["detected_product"]
-    assert result["match_source"] == "filename_metadata"
+    assert result["detection_source"] == "filename_metadata"
 
 
 @pytest.mark.asyncio
@@ -322,46 +333,6 @@ def test_multi_condition_strictest_limit_and_highest_weight():
     assert merged["sugars_g"]["weight"] == 4.0
 
 
-def test_personal_match_score_no_preferences_and_clamp():
-    """
-    Personal Match Score (0-100, higher = better):
-    If user has selected NO preferences, show 'No preferences selected'
-    and apply only claim and nutrient signals. Never invent a default like 75.
-    """
-    engine = PersonalizedScoringEngine()
-    
-    # 1. Product with no claims and nutrient rating = 1.0 (perfect)
-    res_clean = engine.calculate_personal_match_score(
-        nutrient_rating=1.0,
-        claims=[],
-        ingredients=["Oats", "Water"],
-        oil_declared="None declared",
-        preferences=[],
-        avoided_ingredients=[],
-        preferred_ingredients=[],
-    )
-    assert res_clean["personal_match_score"] == 100
-    assert res_clean["has_preferences"] is False
-    assert res_clean["preferences_label"] == "No preferences selected"
-    
-    # 2. Product with nutrient rating = 10.0, 1 CONTRADICTED claim (-30), 1 MISLEADING claim (-15)
-    # Start 100; -30; -15; nutrient penalty: -(10-1) * 25/9 = -25.
-    # Total = 100 - 30 - 15 - 25 = 30
-    res_bad = engine.calculate_personal_match_score(
-        nutrient_rating=10.0,
-        claims=[
-            {"claim": "Healthy Growth", "audit_verdict": "CONTRADICTED"},
-            {"claim": "Zero Trans Fat", "audit_verdict": "MISLEADING"}
-        ],
-        ingredients=["Sugar", "Refined Flour"],
-        oil_declared="None declared",
-        preferences=[],
-        avoided_ingredients=[],
-        preferred_ingredients=[],
-    )
-    assert res_bad["personal_match_score"] == 30
-    assert res_bad["preferences_label"] == "No preferences selected"
-
 
 def test_allergy_check_not_safe_hides_scores():
     """
@@ -393,7 +364,7 @@ def test_allergy_check_not_safe_hides_scores():
     assert eval_res["product_rating"] is None
     assert eval_res["nutrient_rating"] is None
     assert eval_res["ingredient_rating"] is None
-    assert eval_res["personal_match_score"] is None
+    assert "personal_match_score" not in eval_res
 
 
 def test_claim_verdicts_only_allowed_and_non_nutrient_check():
@@ -492,15 +463,16 @@ async def test_score_personal_endpoint(async_db):
                 "oil_listed": {"value": "Cold Pressed Mustard Oil", "is_palm_oil": False}
             },
             "conditions": ["general_health"],
-            "user_allergens": [],
-            "preferences": []
+            "user_allergens": []
         }
         res = await client.post("/api/score-personal", json=payload)
         assert res.status_code == 200
         data = res.json()
         assert "product_rating" in data
-        assert "personal_match_score" in data
+        assert "nutrient_rating" in data
+        assert "ingredient_rating" in data
         assert "allergy_check" in data
+        assert "personal_match_score" not in data
         assert data["show_scores"] is True
     app.dependency_overrides.clear()
 
@@ -517,3 +489,227 @@ async def test_reference_standards_endpoint(async_db):
         assert "diabetes_clinical_guidance" in data
         assert data["access_date"] == "2026-10-24"
     app.dependency_overrides.clear()
+
+
+# =========================================================================
+# REVISED SPECIFICATION TESTS: STRICT PERSONALISED RATING & RECOMMENDATIONS
+# =========================================================================
+
+def test_rating_identical_regardless_of_claims_or_former_preference_input():
+    """
+    Requirement 2 & 6:
+    Assert that the Personalised Rating is IDENTICAL regardless of claim verdicts
+    or any former preference input.
+    Personalised Rating depends ONLY on:
+    - nutrient values vs selected health condition limits and weights
+    - ingredient risk values
+    - selected health conditions
+    Nothing else may change it: no preferences, no claim verdicts, no match score.
+    """
+    engine = PersonalizedScoringEngine()
+    
+    base_product = {
+        "nutrition": {
+            "sugars_g": {"value": 8.0},
+            "sodium_mg": {"value": 350.0},
+            "saturated_fat_g": {"value": 2.5},
+            "protein_g": {"value": 4.0},
+            "fat_g": {"value": 6.0},
+            "carbs_g": {"value": 20.0}
+        },
+        "ingredients": [
+            {"name": "Whole Wheat Flour"},
+            {"name": "Oats"},
+            {"name": "Sunflower Oil"},
+            {"name": "Salt"}
+        ],
+        "oil_listed": {"value": "Sunflower Oil", "is_palm_oil": False}
+    }
+
+    # Case 1: All claims VERIFIED
+    prod_verified = dict(base_product)
+    prod_verified["front_pack_claims"] = [
+        {"claim": "High Fibre", "audit_verdict": "VERIFIED"},
+        {"claim": "No Added Preservatives", "audit_verdict": "VERIFIED"}
+    ]
+    res_verified = engine.evaluate(prod_verified, selected_conditions=["general_health"])
+
+    # Case 2: All claims CONTRADICTED or MISLEADING
+    prod_contradicted = dict(base_product)
+    prod_contradicted["front_pack_claims"] = [
+        {"claim": "100% Superfood", "audit_verdict": "CONTRADICTED"},
+        {"claim": "Zero Calorie", "audit_verdict": "MISLEADING"}
+    ]
+    res_contradicted = engine.evaluate(prod_contradicted, selected_conditions=["general_health"])
+
+    # Case 3: No claims at all
+    prod_no_claims = dict(base_product)
+    prod_no_claims["front_pack_claims"] = []
+    res_no_claims = engine.evaluate(prod_no_claims, selected_conditions=["general_health"])
+
+    # Ratings MUST BE 100% IDENTICAL across all cases
+    assert res_verified["product_rating"] == res_contradicted["product_rating"] == res_no_claims["product_rating"]
+    assert res_verified["nutrient_rating"] == res_contradicted["nutrient_rating"] == res_no_claims["nutrient_rating"]
+    assert res_verified["ingredient_rating"] == res_contradicted["ingredient_rating"] == res_no_claims["ingredient_rating"]
+    
+    # Assert neither personal_match_score nor preferences exist in output
+    assert "personal_match_score" not in res_verified
+    assert "preferences" not in res_verified
+    assert "match_details" not in res_verified
+
+
+def test_no_code_path_reads_preferences():
+    """
+    Requirement 6:
+    Assert that no code path reads preferences.
+    Evaluate signature takes ONLY product_data, selected_conditions, user_allergens.
+    """
+    import inspect
+    engine = PersonalizedScoringEngine()
+    sig = inspect.signature(engine.evaluate)
+    param_names = list(sig.parameters.keys())
+    
+    assert "preferences" not in param_names
+    assert "avoided_ingredients" not in param_names
+    assert "preferred_ingredients" not in param_names
+    assert "match_score" not in param_names
+
+    # Check PersonalizeRequest schema ignores or rejects preferences
+    from app.schemas.product import PersonalizeRequest, AuditRequest
+    req_fields = list(PersonalizeRequest.model_fields.keys())
+    assert "preferences" not in req_fields
+    assert "avoided_ingredients" not in req_fields
+    assert "preferred_ingredients" not in req_fields
+    assert "strict_palm_oil" not in req_fields
+
+    audit_fields = list(AuditRequest.model_fields.keys())
+    assert "preferences" not in audit_fields
+    assert "avoided_ingredients" not in audit_fields
+    assert "preferred_ingredients" not in audit_fields
+
+
+def test_recommendations_category_ranking_and_allergy_exclusion():
+    """
+    Requirement 4:
+    RECOMMENDATIONS: in the same category, exclude products with allergy status NOT SAFE,
+    then rank by Personalised Rating (lowest first). Break ties by fewer CONTRADICTED / MISLEADING claims.
+    Show the reason in plain words using nutrient and ingredient findings only.
+    """
+    engine = PersonalizedScoringEngine()
+
+    current_product = {
+        "product_name": {"value": "High Fat Potato Chips"},
+        "category": {"value": "Savory Packaged Snack"},
+        "nutrition": {
+            "sugars_g": {"value": 1.0},
+            "saturated_fat_g": {"value": 5.0},
+            "sodium_mg": {"value": 450.0}
+        },
+        "ingredients": ["Potato", "Palmolein", "Salt"],
+        "oil_listed": {"value": "Palmolein", "is_palm_oil": True}
+    }
+
+    candidates = [
+        # Candidate 1: Contains peanut - user is allergic to peanut -> MUST BE EXCLUDED
+        {
+            "product_name": {"value": "Peanut Chikki Snack", "source_url": "https://test.com"},
+            "brand": {"value": "NutBrand"},
+            "category": {"value": "Savory Packaged Snack"},
+            "nutrition": {"sugars_g": {"value": 4.0}, "saturated_fat_g": {"value": 1.0}, "sodium_mg": {"value": 80.0}},
+            "ingredients": [{"name": "Peanuts"}, {"name": "Jaggery"}],
+            "oil_listed": {"value": "None"},
+            "front_pack_claims": []
+        },
+        # Candidate 2: Clean, low rating (e.g. 1.8), 0 contradicted claims -> RANK 1
+        {
+            "product_name": {"value": "Roasted Foxnuts Pink Salt", "source_url": "https://test.com"},
+            "brand": {"value": "HealthyBrand"},
+            "category": {"value": "Savory Packaged Snack"},
+            "nutrition": {"sugars_g": {"value": 0.2}, "saturated_fat_g": {"value": 0.4}, "sodium_mg": {"value": 110.0}},
+            "ingredients": [{"name": "Foxnuts (Makhana)"}, {"name": "Olive Oil"}, {"name": "Rock Salt"}],
+            "oil_listed": {"value": "Olive Oil", "is_palm_oil": False},
+            "front_pack_claims": [
+                {"claim": "Roasted", "audit_verdict": "VERIFIED"}
+            ]
+        },
+        # Candidate 3: Moderate rating (e.g. 3.2), 1 contradicted claim -> RANK 2
+        {
+            "product_name": {"value": "Baked Multigrain Crisp", "source_url": "https://test.com"},
+            "brand": {"value": "CrispBrand"},
+            "category": {"value": "Savory Packaged Snack"},
+            "nutrition": {"sugars_g": {"value": 2.0}, "saturated_fat_g": {"value": 1.8}, "sodium_mg": {"value": 240.0}},
+            "ingredients": [{"name": "Wheat"}, {"name": "Corn"}, {"name": "Sunflower Oil"}],
+            "oil_listed": {"value": "Sunflower Oil", "is_palm_oil": False},
+            "front_pack_claims": [
+                {"claim": "Zero Fat", "audit_verdict": "CONTRADICTED"}
+            ]
+        }
+    ]
+
+    recs = engine.rank_recommendations(
+        current_product=current_product,
+        candidate_products=candidates,
+        selected_conditions=["general_health"],
+        user_allergens=["peanut"]
+    )
+
+    rec_names = [r["product_name"] for r in recs]
+
+    # 1. Product with allergen 'peanut' MUST be excluded
+    assert "Peanut Chikki Snack" not in rec_names
+
+    # 2. Lowest rating first
+    assert recs[0]["product_name"] == "Roasted Foxnuts Pink Salt"
+    assert recs[0]["personalised_rating"] <= recs[-1]["personalised_rating"]
+    # Break ties by fewer contradicted/misleading claims
+    assert recs[0]["flagged_claims_count"] <= recs[-1]["flagged_claims_count"]
+
+    # 3. Reason uses nutrient and ingredient findings only
+    for r in recs:
+        reason = r["recommendation_reason"]
+        assert len(reason) > 5
+        # Must strictly use nutrient and ingredient findings
+        assert any(k in reason.lower() for k in ["sodium", "sugar", "saturated fat", "fat", "oil", "additive", "rating"])
+        # Must not mention match or preferences
+        assert "match" not in reason.lower()
+        assert "preference" not in reason.lower()
+
+
+def test_no_forbidden_leftovers_in_production_codebase():
+    """
+    Requirement 6:
+    Search the codebase for 'match', 'pref', 'profile_fit' and remove leftovers.
+    Asserts zero occurrences in backend/app and frontend/src.
+    """
+    import os, re
+
+    forbidden_patterns = [
+        r'\bmatch_score\b',
+        r'\bpersonal_match_score\b',
+        r'\bprofile_fit\b',
+        r'\bpref_fit\b',
+        r'\bpreferences\b',
+        r'\bavoided_ingredients\b',
+        r'\bpreferred_ingredients\b',
+        r'\bstrict_palm_oil\b',
+        r'Final Clamped Match Score',
+        r'Nutrient profile penalty',
+    ]
+    regex = re.compile('|'.join(forbidden_patterns), re.IGNORECASE)
+
+    paths_to_scan = ['backend/app', 'frontend/src']
+    findings = []
+
+    for base_dir in paths_to_scan:
+        for root, dirs, files in os.walk(base_dir):
+            if '__pycache__' in root or 'node_modules' in root:
+                continue
+            for f in files:
+                if f.endswith(('.py', '.json', '.jsx', '.js', '.css', '.html')):
+                    full_p = os.path.join(root, f)
+                    with open(full_p, 'r', encoding='utf-8', errors='ignore') as fl:
+                        for idx, line in enumerate(fl, 1):
+                            if regex.search(line):
+                                findings.append(f"{full_p}:{idx}: {line.strip()}")
+
+    assert not findings, f"Found forbidden leftovers in codebase: {findings}"

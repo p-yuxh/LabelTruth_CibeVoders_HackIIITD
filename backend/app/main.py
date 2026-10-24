@@ -16,11 +16,13 @@ logger = logging.getLogger("labeltruth")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Initializing LabelTruth Backend Service...")
-    await init_db()
-    logger.info("LabelTruth ready to audit packaged foods claims.")
+    if not os.getenv("TESTING"):
+        logger.info("Initializing LabelTruth Backend Service...")
+        await init_db()
+        logger.info("LabelTruth ready to audit packaged foods claims.")
     yield
-    logger.info("Shutting down LabelTruth Backend Service...")
+    if not os.getenv("TESTING"):
+        logger.info("Shutting down LabelTruth Backend Service...")
 
 
 app = FastAPI(

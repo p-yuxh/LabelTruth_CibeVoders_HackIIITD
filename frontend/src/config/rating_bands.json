@@ -1,0 +1,44 @@
+{
+  "scale": {
+    "min": 1,
+    "max": 10,
+    "direction": "lower_is_better",
+    "legend": "1 = best, 10 = worst"
+  },
+  "bands": [
+    {
+      "id": "good",
+      "cutoff": 3.0,
+      "label": "Good fit",
+      "bg": "var(--rating-good-bg)",
+      "text": "var(--rating-good-text)"
+    },
+    {
+      "id": "moderate",
+      "cutoff": 5.0,
+      "label": "Moderate",
+      "bg": "var(--rating-moderate-bg)",
+      "text": "var(--rating-moderate-text)"
+    },
+    {
+      "id": "poor",
+      "cutoff": 7.0,
+      "label": "Poor",
+      "bg": "var(--rating-poor-bg)",
+      "text": "var(--rating-poor-text)"
+    },
+    {
+      "id": "very_poor",
+      "cutoff": null,
+      "label": "Very poor",
+      "bg": "var(--rating-very-poor-bg)",
+      "text": "var(--rating-very-poor-text)"
+    }
+  ],
+  "no_data": {
+    "label": "No data",
+    "bg": "var(--rating-nodata-bg)",
+    "text": "var(--rating-nodata-text)"
+  }
+}
+

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ExternalLink, AlertTriangle, CheckCircle, ShieldAlert, FileText, Scale } from 'lucide-react';
 import PersonalizedScoringSection from './PersonalizedScoringSection';
+import ClaimVerdictTag from './ClaimVerdictTag';
 import ReferenceStandardsSection from './ReferenceStandardsSection';
 
 export default function ProductCard({ data }) {
@@ -22,18 +23,12 @@ export default function ProductCard({ data }) {
 
   const isPalmOil = oil_listed?.is_palm_oil || false;
 
-  const getVerdictClass = (verdict) => {
-    const v = (verdict || '').toUpperCase();
-    if (v.includes('CONTRADICTED')) return 'contradicted';
-    if (v.includes('MISLEADING')) return 'misleading';
-    if (v.includes('VERIFIED')) return 'verified';
-    return 'no-evidence';
-  };
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* =========================================
-          TOP: Personalized Rating & Match Score Engine
+          TOP: Personalised Rating Engine
          ========================================= */}
       <PersonalizedScoringSection
         productData={data}
@@ -233,9 +228,7 @@ export default function ProductCard({ data }) {
                   <div key={idx} className="claim-item">
                     <div className="claim-header">
                       <span className="claim-text">"{item.claim}"</span>
-                      <span className={`verdict-tag ${getVerdictClass(item.audit_verdict)}`}>
-                        {item.audit_verdict}
-                      </span>
+                      <ClaimVerdictTag verdict={item.audit_verdict} />
                     </div>
                     <div className="claim-reason">{item.verdict_reason}</div>
                     {item.source_url && (

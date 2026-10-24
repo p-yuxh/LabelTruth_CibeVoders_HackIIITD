@@ -19,7 +19,7 @@ EXCLUDED_DOMAINS = [
     "linkedin.com", "reddit.com", "quora.com", "tumblr.com"
 ]
 
-PREFERRED_DOMAINS = [
+RETAILER_DOMAINS = [
     "blinkit.com", "zeptonow.com", "bigbasket.com", "amazon.in",
     "jiomart.com", "swiggy.com", "dmart.in", "flipkart.com", "freshtohome.com"
 ]
@@ -150,7 +150,7 @@ class TinyFishScraperService:
         lab_url = ""
         
         # 1. Filter and select the best retailer URL
-        preferred_candidates = []
+        retailer_candidates = []
         valid_candidates = []
         for item in search_results:
             if item.get("type") == "retailer_product" and item.get("url"):
@@ -158,13 +158,13 @@ class TinyFishScraperService:
                 u_lower = u.lower()
                 if any(ex in u_lower for ex in EXCLUDED_DOMAINS):
                     continue
-                if any(pref in u_lower for pref in PREFERRED_DOMAINS):
-                    preferred_candidates.append(u)
+                if any(domain in u_lower for domain in RETAILER_DOMAINS):
+                    retailer_candidates.append(u)
                 else:
                     valid_candidates.append(u)
 
-        if preferred_candidates:
-            product_url = preferred_candidates[0]
+        if retailer_candidates:
+            product_url = retailer_candidates[0]
         elif valid_candidates:
             product_url = valid_candidates[0]
         else:

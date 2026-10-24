@@ -17,8 +17,7 @@ class AuditOrchestrator:
     """
     Evidence-based Audit Orchestrator.
     Executes PostgreSQL evidence caching, TinyFish autonomous scraping,
-    claim audits, statutory citations, and the revised Personalized Rating
-    and Match Score engine.
+    claim audits, statutory citations, and the Personalised Rating engine.
     """
 
     def __init__(
@@ -37,24 +36,14 @@ class AuditOrchestrator:
         force_refresh: bool = False,
         conditions: Optional[List[str]] = None,
         user_allergens: Optional[List[str]] = None,
-        preferences: Optional[List[str]] = None,
-        avoided_ingredients: Optional[List[str]] = None,
-        preferred_ingredients: Optional[List[str]] = None,
         profile: str = "general_health",
-        strict_palm_oil: bool = False,
-        goals: Optional[list] = None,
         share_of_daily: float = 0.15,
+        **kwargs
     ) -> Dict[str, Any]:
         cleaned_query = query.strip()
         normalized_query_key = cleaned_query.lower()
 
-        # Normalize conditions and preferences
         selected_cond = conditions or ([profile] if profile else ["general_health"])
-        user_pref = list(preferences or [])
-        if strict_palm_oil and "avoid_palm_oil" not in user_pref:
-            user_pref.append("avoid_palm_oil")
-        if goals:
-            user_pref.extend(goals)
 
         # Step 1: Cache check in PostgreSQL evidence log
         if not force_refresh:
@@ -71,17 +60,15 @@ class AuditOrchestrator:
                 logger.info(f"CACHE HIT: Returning cached evidence log #{cached_entry.id} for '{cleaned_query}'")
                 product_data = dict(cached_entry.product_data)
                 
-                # Remove legacy claim_integrity_score if present in cache
+                # Remove legacy score keys if present
                 product_data.pop("claim_integrity_score", None)
+                product_data.pop("legacy_score", None)
 
-                # Dynamic personalization on cache hit
+                # Personalised rating evaluation
                 personalized_eval = self.scoring_engine.evaluate(
                     product_data=product_data,
                     selected_conditions=selected_cond,
                     user_allergens=user_allergens or [],
-                    preferences=user_pref,
-                    avoided_ingredients=avoided_ingredients or [],
-                    preferred_ingredients=preferred_ingredients or [],
                 )
                 product_data["personalized_scoring"] = personalized_eval
 
@@ -91,6 +78,17 @@ class AuditOrchestrator:
                         product_data.get("front_pack_claims", []),
                         product_data.get("ingredients", [])
                     )
+
+                # Fetch candidate category products from evidence log
+                stmt_recs = select(EvidenceLog).order_by(EvidenceLog.created_at.desc()).limit(30)
+                recs_res = await session.execute(stmt_recs)
+                cached_recs = [r.product_data for r in recs_res.scalars().all() if r.product_data]
+                product_data["recommendations"] = self.scoring_engine.rank_recommendations(
+                    current_product=product_data,
+                    candidate_products=cached_recs,
+                    selected_conditions=selected_cond,
+                    user_allergens=user_allergens or [],
+                )
 
                 return {
                     "query": cleaned_query,
@@ -113,14 +111,22 @@ class AuditOrchestrator:
             tinyfish_data=tinyfish_result,
             conditions=selected_cond,
             user_allergens=user_allergens or [],
-            preferences=user_pref,
-            avoided_ingredients=avoided_ingredients or [],
-            preferred_ingredients=preferred_ingredients or [],
             share_of_daily=share_of_daily,
         )
 
-        # Remove legacy claim_integrity_score if present
         normalized_data.pop("claim_integrity_score", None)
+        normalized_data.pop("legacy_score", None)
+
+        # Generate category recommendations
+        stmt_recs = select(EvidenceLog).order_by(EvidenceLog.created_at.desc()).limit(30)
+        recs_res = await session.execute(stmt_recs)
+        cached_recs = [r.product_data for r in recs_res.scalars().all() if r.product_data]
+        normalized_data["recommendations"] = self.scoring_engine.rank_recommendations(
+            current_product=normalized_data,
+            candidate_products=cached_recs,
+            selected_conditions=selected_cond,
+            user_allergens=user_allergens or [],
+        )
 
         # Step 4: Persist to PostgreSQL Evidence Log
         product_name = normalized_data.get("product_name", {}).get("value")
@@ -151,7 +157,7 @@ class AuditOrchestrator:
             "query": cleaned_query,
             "is_cached": False,
             "evidence_log_id": evidence_log.id,
-            "created_at": evidence_log.created_at.isoformat(),
+            "created_at": evidence_log.created_at.isoformat() if evidence_log.created_at else datetime.now(timezone.utc).isoformat(),
             "source_urls": source_urls,
             "data": normalized_data,
             "tinyfish_agent_raw": tinyfish_result.get("agent_data"),

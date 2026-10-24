@@ -7,7 +7,6 @@ from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger("labeltruth.personalized_scoring")
 
-# Paths to statutory configuration files
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config_data")
 PROFILES_CONFIG_PATH = os.path.join(CONFIG_DIR, "nutrition_profiles.json")
 INGREDIENTS_CONFIG_PATH = os.path.join(CONFIG_DIR, "ingredient_risks.json")
@@ -34,7 +33,7 @@ def load_ingredient_risks_config() -> Dict[str, Any]:
 def excess_rating(actual: float, limit: float) -> int:
     """
     Computes nutrient excess rating r_k on a 1-10 scale (1 = best, 10 = worst).
-    Exact formula:
+    Formula:
     r_k = 1 if actual <= limit else min(10, 1 + ceil(round((actual - limit)/limit * 9, 9)))
     """
     if limit <= 0:
@@ -46,20 +45,177 @@ def excess_rating(actual: float, limit: float) -> int:
     return int(min(10, val))
 
 
+# Built-in reference products across common Indian categories for category recommendations
+CATEGORY_REFERENCE_PRODUCTS: List[Dict[str, Any]] = [
+    {
+        "product_name": {"value": "The Whole Truth Roasted Makhana Himalayan Pink Salt", "source_url": "https://thewholetruthfoods.com"},
+        "brand": {"value": "The Whole Truth", "source_url": "https://thewholetruthfoods.com"},
+        "category": {"value": "Savory Packaged Snack", "source_url": "https://thewholetruthfoods.com"},
+        "nutrition": {
+            "serving_size": {"value": "30g", "source_url": "https://thewholetruthfoods.com"},
+            "kcal": {"value": 115.0, "unit": "kcal", "source_url": "https://thewholetruthfoods.com"},
+            "carbs_g": {"value": 19.0, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "sugars_g": {"value": 0.2, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "protein_g": {"value": 3.0, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "fat_g": {"value": 2.1, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "saturated_fat_g": {"value": 0.4, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "sodium_mg": {"value": 110.0, "unit": "mg", "source_url": "https://thewholetruthfoods.com"},
+        },
+        "ingredients": [
+            {"name": "Foxnuts (Makhana)", "source_url": "https://thewholetruthfoods.com"},
+            {"name": "Cold Pressed Sunflower Oil", "source_url": "https://thewholetruthfoods.com"},
+            {"name": "Himalayan Pink Salt", "source_url": "https://thewholetruthfoods.com"}
+        ],
+        "oil_listed": {"value": "Cold Pressed Sunflower Oil", "is_palm_oil": False, "source_url": "https://thewholetruthfoods.com"},
+        "front_pack_claims": [
+            {"claim": "No Palm Oil", "audit_verdict": "VERIFIED", "verdict_reason": "Cold pressed sunflower oil confirmed."},
+            {"claim": "Low Saturated Fat", "audit_verdict": "VERIFIED", "verdict_reason": "0.4g saturated fat per serving."}
+        ]
+    },
+    {
+        "product_name": {"value": "Farmley Roasted Peri Peri Makhana", "source_url": "https://farmley.com"},
+        "brand": {"value": "Farmley", "source_url": "https://farmley.com"},
+        "category": {"value": "Savory Packaged Snack", "source_url": "https://farmley.com"},
+        "nutrition": {
+            "serving_size": {"value": "30g", "source_url": "https://farmley.com"},
+            "kcal": {"value": 120.0, "unit": "kcal", "source_url": "https://farmley.com"},
+            "carbs_g": {"value": 20.0, "unit": "g", "source_url": "https://farmley.com"},
+            "sugars_g": {"value": 0.5, "unit": "g", "source_url": "https://farmley.com"},
+            "protein_g": {"value": 2.8, "unit": "g", "source_url": "https://farmley.com"},
+            "fat_g": {"value": 2.4, "unit": "g", "source_url": "https://farmley.com"},
+            "saturated_fat_g": {"value": 0.5, "unit": "g", "source_url": "https://farmley.com"},
+            "sodium_mg": {"value": 140.0, "unit": "mg", "source_url": "https://farmley.com"},
+        },
+        "ingredients": [
+            {"name": "Foxnuts (Makhana)", "source_url": "https://farmley.com"},
+            {"name": "Olive Oil", "source_url": "https://farmley.com"},
+            {"name": "Chilli Powder", "source_url": "https://farmley.com"},
+            {"name": "Iodised Salt", "source_url": "https://farmley.com"}
+        ],
+        "oil_listed": {"value": "Olive Oil", "is_palm_oil": False, "source_url": "https://farmley.com"},
+        "front_pack_claims": [
+            {"claim": "Roasted Not Fried", "audit_verdict": "VERIFIED", "verdict_reason": "Roasted processing confirmed with low fat."},
+            {"claim": "Zero Cholesterol", "audit_verdict": "VERIFIED", "verdict_reason": "Plant-based oil confirmed."}
+        ]
+    },
+    {
+        "product_name": {"value": "WickedGud 100% Whole Wheat & Multi-Millet Noodles", "source_url": "https://wickedgud.com"},
+        "brand": {"value": "WickedGud", "source_url": "https://wickedgud.com"},
+        "category": {"value": "Instant Noodles", "source_url": "https://wickedgud.com"},
+        "nutrition": {
+            "serving_size": {"value": "70g", "source_url": "https://wickedgud.com"},
+            "kcal": {"value": 240.0, "unit": "kcal", "source_url": "https://wickedgud.com"},
+            "carbs_g": {"value": 46.0, "unit": "g", "source_url": "https://wickedgud.com"},
+            "sugars_g": {"value": 1.5, "unit": "g", "source_url": "https://wickedgud.com"},
+            "protein_g": {"value": 9.0, "unit": "g", "source_url": "https://wickedgud.com"},
+            "fat_g": {"value": 1.8, "unit": "g", "source_url": "https://wickedgud.com"},
+            "saturated_fat_g": {"value": 0.4, "unit": "g", "source_url": "https://wickedgud.com"},
+            "sodium_mg": {"value": 260.0, "unit": "mg", "source_url": "https://wickedgud.com"},
+        },
+        "ingredients": [
+            {"name": "Whole Wheat Flour (Atta)", "source_url": "https://wickedgud.com"},
+            {"name": "Finger Millet (Ragi)", "source_url": "https://wickedgud.com"},
+            {"name": "Pearl Millet (Bajra)", "source_url": "https://wickedgud.com"},
+            {"name": "Oats Flour", "source_url": "https://wickedgud.com"},
+            {"name": "Spices & Condiments", "source_url": "https://wickedgud.com"}
+        ],
+        "oil_listed": {"value": "None declared / Steamed and baked", "is_palm_oil": False, "source_url": "https://wickedgud.com"},
+        "front_pack_claims": [
+            {"claim": "Zero Maida", "audit_verdict": "VERIFIED", "verdict_reason": "100% whole grain flours verified."},
+            {"claim": "No Palm Oil", "audit_verdict": "VERIFIED", "verdict_reason": "Non-fried noodle cakes."}
+        ]
+    },
+    {
+        "product_name": {"value": "Slurrp Farm Millet Noodles", "source_url": "https://slurrpfarm.com"},
+        "brand": {"value": "Slurrp Farm", "source_url": "https://slurrpfarm.com"},
+        "category": {"value": "Instant Noodles", "source_url": "https://slurrpfarm.com"},
+        "nutrition": {
+            "serving_size": {"value": "70g", "source_url": "https://slurrpfarm.com"},
+            "kcal": {"value": 245.0, "unit": "kcal", "source_url": "https://slurrpfarm.com"},
+            "carbs_g": {"value": 48.0, "unit": "g", "source_url": "https://slurrpfarm.com"},
+            "sugars_g": {"value": 1.2, "unit": "g", "source_url": "https://slurrpfarm.com"},
+            "protein_g": {"value": 8.0, "unit": "g", "source_url": "https://slurrpfarm.com"},
+            "fat_g": {"value": 2.0, "unit": "g", "source_url": "https://slurrpfarm.com"},
+            "saturated_fat_g": {"value": 0.5, "unit": "g", "source_url": "https://slurrpfarm.com"},
+            "sodium_mg": {"value": 280.0, "unit": "mg", "source_url": "https://slurrpfarm.com"},
+        },
+        "ingredients": [
+            {"name": "Foxtail Millet Flour", "source_url": "https://slurrpfarm.com"},
+            {"name": "Whole Wheat Flour", "source_url": "https://slurrpfarm.com"},
+            {"name": "Natural Spices", "source_url": "https://slurrpfarm.com"}
+        ],
+        "oil_listed": {"value": "Cold Pressed Sesame Oil", "is_palm_oil": False, "source_url": "https://slurrpfarm.com"},
+        "front_pack_claims": [
+            {"claim": "No Maida No Palm Oil", "audit_verdict": "VERIFIED", "verdict_reason": "Ingredients confirm millet flour and cold pressed oil."}
+        ]
+    },
+    {
+        "product_name": {"value": "The Whole Truth 100% Cocoa & Almond Health Mix", "source_url": "https://thewholetruthfoods.com"},
+        "brand": {"value": "The Whole Truth", "source_url": "https://thewholetruthfoods.com"},
+        "category": {"value": "Malt-based Health Food Drink", "source_url": "https://thewholetruthfoods.com"},
+        "nutrition": {
+            "serving_size": {"value": "20g", "source_url": "https://thewholetruthfoods.com"},
+            "kcal": {"value": 80.0, "unit": "kcal", "source_url": "https://thewholetruthfoods.com"},
+            "carbs_g": {"value": 9.0, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "sugars_g": {"value": 1.8, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "protein_g": {"value": 4.5, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "fat_g": {"value": 3.0, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "saturated_fat_g": {"value": 0.8, "unit": "g", "source_url": "https://thewholetruthfoods.com"},
+            "sodium_mg": {"value": 25.0, "unit": "mg", "source_url": "https://thewholetruthfoods.com"},
+        },
+        "ingredients": [
+            {"name": "Almonds", "source_url": "https://thewholetruthfoods.com"},
+            {"name": "Oats Flour", "source_url": "https://thewholetruthfoods.com"},
+            {"name": "Raw Cocoa", "source_url": "https://thewholetruthfoods.com"},
+            {"name": "Dates Powder", "source_url": "https://thewholetruthfoods.com"}
+        ],
+        "oil_listed": {"value": "None declared / No added fats", "is_palm_oil": False, "source_url": "https://thewholetruthfoods.com"},
+        "front_pack_claims": [
+            {"claim": "Zero Added Sugar", "audit_verdict": "VERIFIED", "verdict_reason": "Sweetened purely with whole dates powder."},
+            {"claim": "No Artificial Additives", "audit_verdict": "VERIFIED", "verdict_reason": "Clean four-ingredient formulation."}
+        ]
+    },
+    {
+        "product_name": {"value": "Raw Pressery Pure Tender Coconut Water", "source_url": "https://rawpressery.com"},
+        "brand": {"value": "Raw Pressery", "source_url": "https://rawpressery.com"},
+        "category": {"value": "Carbonated Beverage", "source_url": "https://rawpressery.com"},
+        "nutrition": {
+            "serving_size": {"value": "200ml", "source_url": "https://rawpressery.com"},
+            "kcal": {"value": 40.0, "unit": "kcal", "source_url": "https://rawpressery.com"},
+            "carbs_g": {"value": 9.0, "unit": "g", "source_url": "https://rawpressery.com"},
+            "sugars_g": {"value": 3.5, "unit": "g", "source_url": "https://rawpressery.com"},
+            "protein_g": {"value": 0.4, "unit": "g", "source_url": "https://rawpressery.com"},
+            "fat_g": {"value": 0.0, "unit": "g", "source_url": "https://rawpressery.com"},
+            "saturated_fat_g": {"value": 0.0, "unit": "g", "source_url": "https://rawpressery.com"},
+            "sodium_mg": {"value": 45.0, "unit": "mg", "source_url": "https://rawpressery.com"},
+        },
+        "ingredients": [
+            {"name": "Tender Coconut Water", "source_url": "https://rawpressery.com"},
+            {"name": "Bio-fermented Vitamin C", "source_url": "https://rawpressery.com"}
+        ],
+        "oil_listed": {"value": "None declared", "is_palm_oil": False, "source_url": "https://rawpressery.com"},
+        "front_pack_claims": [
+            {"claim": "No Added Sugar", "audit_verdict": "VERIFIED", "verdict_reason": "Naturally occurring sugars only."},
+            {"claim": "Zero Artificial Sweeteners", "audit_verdict": "VERIFIED", "verdict_reason": "No intense sweeteners detected."}
+        ]
+    }
+]
+
+
 class PersonalizedScoringEngine:
     """
-    Evidence-based Nutritional Personalization & Multi-Condition Engine.
+    Evidence-based Nutritional Personalization & Multi-Condition Rating Engine.
     Implements:
     1) PERSONALISED RATING (1-10, lower = better):
        - nutrient_rating: weighted r_k with clinical worst-case safety floor: max(base, 0.7*max(r_k) + 0.3*base)
        - ingredient_rating: position weights (first=n, last=1) with flagged override: max(base, 0.7*worst_flagged + 0.3*base)
+         including condition-specific risk values from ingredient_risks.json.
        - product_rating: 0.6 * nutrient_rating + 0.4 * ingredient_rating
        - Multiple conditions: strictest (lowest) limit, highest weight per nutrient
-    2) PERSONAL MATCH SCORE (0-100, higher = better, preferences only):
-       - Start 100; avoided ingredient -35; undisclosed oil -15; preferred +15;
-       - CONTRADICTED claim -30; MISLEADING claim -15; nutrient penalty -(nutrient_rating - 1) * 25/9. Clamp 0-100.
-       - No preferences: shows 'No preferences selected' and applies claim and nutrient signals only.
-    3) ALLERGY CHECK: Separate hard rule (NOT SAFE FOR YOU / CANNOT CONFIRM / NONE FOUND). If NOT SAFE, show no scores.
+       - Depends ONLY on nutrients vs health condition limits/weights, ingredient risks, and health conditions.
+    2) ALLERGY CHECK: Separate hard rule (NOT SAFE FOR YOU / CANNOT CONFIRM / NONE FOUND). If NOT SAFE, show no rating.
+    3) RECOMMENDATIONS: In the same category, exclude products with allergy status NOT SAFE, rank by
+       Personalised Rating (lowest first), breaking ties by fewer CONTRADICTED / MISLEADING claims.
     """
 
     def __init__(self):
@@ -179,15 +335,16 @@ class PersonalizedScoringEngine:
     def calculate_ingredient_rating(
         self,
         ingredients: List[Any],
-        oil_declared: str = ""
+        oil_declared: str = "",
+        selected_conditions: Optional[List[str]] = None
     ) -> Tuple[Optional[float], List[Dict[str, Any]], Dict[str, Any]]:
         """
         Computes ingredient_rating (1-10, lower = better):
         Position weights (first = n, last = 1);
+        Evaluates ingredient risks including condition-specific risk values;
         base = weighted average;
         if any flagged ingredient: max(base, 0.7*worst_flagged + 0.3*base)
         """
-        # Normalize ingredients list
         norm_ingredients = []
         if isinstance(ingredients, str):
             norm_ingredients = [i.strip() for i in ingredients.split(",") if i.strip()]
@@ -198,13 +355,14 @@ class PersonalizedScoringEngine:
                 elif item:
                     norm_ingredients.append(str(item).strip())
 
-        # If oil is declared and not present in ingredients, incorporate it
         if oil_declared and oil_declared.lower() not in ["none declared", "no cooking oil declared"]:
             if not any(oil_declared.lower() in ing.lower() for ing in norm_ingredients):
                 norm_ingredients.append(oil_declared)
 
         if not norm_ingredients:
             return None, [], {}
+
+        active_conditions = [c.lower().strip() for c in (selected_conditions or ["general_health"])]
 
         n = len(norm_ingredients)
         scored_ingredients = []
@@ -215,16 +373,22 @@ class PersonalizedScoringEngine:
             risk_score = 1
             is_flagged = False
             flag_reason = "Whole or permitted food ingredient"
-            rule_matched = None
+            rule_applied = None
 
             ing_lower = ing_name.lower()
             for rule in self.ingredient_rules:
                 pat = rule.get("pattern", "")
                 if re.search(pat, ing_lower, re.IGNORECASE):
                     risk_score = rule.get("risk_score", 1)
+                    # Condition-specific risk lookup
+                    condition_risks = rule.get("condition_risks", {})
+                    for cond in active_conditions:
+                        if cond in condition_risks:
+                            risk_score = max(risk_score, condition_risks[cond])
+
                     is_flagged = rule.get("flagged", False)
                     flag_reason = rule.get("reason", "")
-                    rule_matched = rule
+                    rule_applied = rule
                     break
 
             item_data = {
@@ -235,9 +399,9 @@ class PersonalizedScoringEngine:
                 "is_flagged": is_flagged,
                 "flag_reason": flag_reason,
                 "weighted_contribution": pos_weight * risk_score,
-                "source_name": rule_matched.get("source_name", "FSSAI Food Additives & Labelling Standards") if rule_matched else "FSSAI Packaging Standards",
-                "source_url": rule_matched.get("source_url", "https://www.fssai.gov.in") if rule_matched else "https://www.fssai.gov.in",
-                "access_date": rule_matched.get("access_date", "2026-10-24") if rule_matched else "2026-10-24",
+                "source_name": rule_applied.get("source_name", "FSSAI Food Additives & Labelling Standards") if rule_applied else "FSSAI Packaging Standards",
+                "source_url": rule_applied.get("source_url", "https://www.fssai.gov.in") if rule_applied else "https://www.fssai.gov.in",
+                "access_date": rule_applied.get("access_date", "2026-10-24") if rule_applied else "2026-10-24",
             }
             scored_ingredients.append(item_data)
             if is_flagged:
@@ -256,7 +420,6 @@ class PersonalizedScoringEngine:
             worst_flagged_item = {}
             ingredient_rating = base
 
-        # Sort top 3 contributing ingredients (by risk and position weight)
         top_3 = sorted(
             scored_ingredients,
             key=lambda x: (x["is_flagged"], x["risk_score"], x["position_weight"]),
@@ -272,7 +435,7 @@ class PersonalizedScoringEngine:
     ) -> Tuple[Optional[float], bool, str]:
         """
         product_rating = 0.6 * nutrient_rating + 0.4 * ingredient_rating
-        (if one is None use the other and mark "partial data")
+        (if one is None use the other and mark partial data)
         """
         if nutrient_rating is None and ingredient_rating is None:
             return None, False, "No nutritional or ingredient data available"
@@ -295,17 +458,16 @@ class PersonalizedScoringEngine:
         """
         ALLERGY CHECK stays a separate hard rule:
         NOT SAFE FOR YOU / CANNOT CONFIRM / NONE FOUND.
-        If NOT SAFE, show no scores.
+        If NOT SAFE FOR YOU, show no rating.
         """
         if not user_allergens:
             return {
                 "allergy_status": "NONE FOUND",
-                "matched_allergens": [],
+                "found_allergens": [],
                 "is_safe": True,
                 "message": "No user allergen restrictions declared.",
             }
 
-        # Normalize ingredient text
         text_corpus = []
         if isinstance(ingredients, str):
             text_corpus.append(ingredients)
@@ -323,203 +485,233 @@ class PersonalizedScoringEngine:
         if not full_text:
             return {
                 "allergy_status": "CANNOT CONFIRM",
-                "matched_allergens": [],
+                "found_allergens": [],
                 "is_safe": False,
                 "message": "CANNOT CONFIRM: Ingredient declaration is missing or incomplete.",
             }
 
-        matched = []
+        found_allergens = []
         for user_allergen in user_allergens:
             al_clean = user_allergen.strip().lower()
             if not al_clean:
                 continue
 
-            # Standard allergen expansion
             patterns = [re.escape(al_clean)]
+            if al_clean.endswith('s'):
+                patterns.append(re.escape(al_clean[:-1]))
+            else:
+                patterns.append(re.escape(al_clean + 's'))
+
             if al_clean in ["peanut", "peanuts"]:
-                patterns.extend(["groundnut", "arachis"])
+                patterns.extend(["peanut", "peanuts", "groundnut", "groundnuts", "arachis"])
             elif al_clean in ["milk", "dairy"]:
-                patterns.extend(["lactose", "casein", "whey", "butter", "cheese", "cream"])
+                patterns.extend(["milk", "dairy", "lactose", "casein", "whey", "butter", "cheese", "cream"])
             elif al_clean in ["gluten", "wheat"]:
-                patterns.extend(["maida", "atta", "semolina", "suji", "barley", "malt", "rye"])
+                patterns.extend(["gluten", "wheat", "maida", "atta", "semolina", "suji", "barley", "malt", "rye"])
             elif al_clean in ["soy", "soya"]:
-                patterns.extend(["soybean", "soy lecithin", "soya lecithin"])
-            elif al_clean in ["nut", "tree nut", "tree nuts"]:
-                patterns.extend(["almond", "cashew", "walnut", "pistachio", "hazelnut"])
+                patterns.extend(["soy", "soya", "soybean", "soybeans", "soy lecithin", "soya lecithin"])
+            elif al_clean in ["nut", "nuts", "tree nut", "tree nuts"]:
+                patterns.extend(["nut", "nuts", "almond", "almonds", "cashew", "cashews", "walnut", "walnuts", "pistachio", "pistachios", "hazelnut", "hazelnuts"])
+            elif al_clean in ["mustard", "mustards"]:
+                patterns.extend(["mustard", "mustards", "sarson", "rai"])
 
             regex = r'\b(?:' + '|'.join(patterns) + r')\b'
             if re.search(regex, full_text, re.IGNORECASE):
-                matched.append(user_allergen.title())
+                found_allergens.append(user_allergen.title())
 
-        if matched:
+        if found_allergens:
+            unique_found = list(dict.fromkeys(found_allergens))
             return {
                 "allergy_status": "NOT SAFE FOR YOU",
-                "matched_allergens": list(dict.fromkeys(matched)),
+                "found_allergens": unique_found,
                 "is_safe": False,
-                "message": f"NOT SAFE FOR YOU: Contains declared allergen(s): {', '.join(dict.fromkeys(matched))}.",
+                "message": f"NOT SAFE FOR YOU: Contains declared allergen(s): {', '.join(unique_found)}.",
             }
 
         return {
             "allergy_status": "NONE FOUND",
-            "matched_allergens": [],
+            "found_allergens": [],
             "is_safe": True,
             "message": "NONE FOUND: None of your specified allergens were detected in label statement.",
         }
 
-    def calculate_personal_match_score(
+    def rank_recommendations(
         self,
-        nutrient_rating: Optional[float],
-        claims: List[Dict[str, Any]],
-        ingredients: List[Any],
-        oil_declared: str,
-        preferences: List[str],
-        avoided_ingredients: List[str],
-        preferred_ingredients: List[str],
-    ) -> Dict[str, Any]:
+        current_product: Dict[str, Any],
+        candidate_products: List[Dict[str, Any]],
+        selected_conditions: Optional[List[str]] = None,
+        user_allergens: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
         """
-        PERSONAL MATCH SCORE (0-100, higher = better), preferences only:
-        start 100;
-        avoided ingredient found -35;
-        oil source undisclosed -15;
-        preferred ingredient confirmed +15;
-        each CONTRADICTED claim -30;
-        each MISLEADING claim -15;
-        nutrient penalty -(nutrient_rating - 1) * 25/9.
-        Clamp 0-100.
-        If user has selected NO preferences, show "No preferences selected" and apply only claim and nutrient signals.
-        Never invent a default like 75.
+        RECOMMENDATIONS: in the same category, exclude products with allergy status NOT SAFE,
+        then rank by Personalised Rating (lowest first).
+        Break ties by fewer CONTRADICTED / MISLEADING claims.
+        Show the reason in plain words using nutrient and ingredient findings only.
         """
-        score = 100.0
-        deductions = []
-        has_preferences = bool(preferences or avoided_ingredients or preferred_ingredients)
+        selected_conditions = selected_conditions or ["general_health"]
+        user_allergens = user_allergens or []
 
-        # 1. Full text of ingredients
-        all_ing_text = []
-        if isinstance(ingredients, list):
-            for i in ingredients:
-                if isinstance(i, dict):
-                    all_ing_text.append(str(i.get("name", "")).lower())
-                elif i:
-                    all_ing_text.append(str(i).lower())
-        full_ing_corpus = " ".join(all_ing_text)
-        oil_clean = oil_declared.strip().lower()
+        # Determine target category
+        curr_cat_val = ""
+        cat_item = current_product.get("category", {})
+        if isinstance(cat_item, dict):
+            curr_cat_val = str(cat_item.get("value", "")).strip().lower()
+        else:
+            curr_cat_val = str(cat_item or "").strip().lower()
 
-        # 2. Preference checks (only if user selected preferences)
-        if has_preferences:
-            # Check avoided ingredients (-35 each)
-            all_avoid = list(avoided_ingredients)
-            if any("palm" in p.lower() for p in preferences):
-                all_avoid.append("palm oil")
+        current_name = ""
+        name_item = current_product.get("product_name", {})
+        if isinstance(name_item, dict):
+            current_name = str(name_item.get("value", "")).strip().lower()
+        else:
+            current_name = str(name_item or "").strip().lower()
 
-            for avoid_term in set(all_avoid):
-                term_clean = avoid_term.strip().lower()
-                if not term_clean:
-                    continue
-                # Term patterns
-                if term_clean in ["palm oil", "palmolein", "palm"]:
-                    is_found = any(p in full_ing_corpus or p in oil_clean for p in ["palmolein", "palm oil", "palm kernel"])
+        # Combine candidates with built-in reference products for complete category coverage
+        all_candidates = []
+        seen_names = set()
+
+        for c in (candidate_products or []) + CATEGORY_REFERENCE_PRODUCTS:
+            cand_name = ""
+            c_name_item = c.get("product_name", {})
+            if isinstance(c_name_item, dict):
+                cand_name = str(c_name_item.get("value", "")).strip()
+            else:
+                cand_name = str(c_name_item or "").strip()
+
+            if not cand_name:
+                continue
+            name_clean = cand_name.lower()
+            if name_clean == current_name or name_clean in seen_names:
+                continue
+            seen_names.add(name_clean)
+
+            # Filter for same category
+            cand_cat = ""
+            c_cat_item = c.get("category", {})
+            if isinstance(c_cat_item, dict):
+                cand_cat = str(c_cat_item.get("value", "")).strip().lower()
+            else:
+                cand_cat = str(c_cat_item or "").strip().lower()
+
+            # Flexible category comparison
+            is_same_category = False
+            if curr_cat_val and cand_cat:
+                if curr_cat_val in cand_cat or cand_cat in curr_cat_val:
+                    is_same_category = True
+                elif any(k in curr_cat_val and k in cand_cat for k in ["snack", "noodle", "drink", "beverage", "biscuit", "chip"]):
+                    is_same_category = True
+            elif not curr_cat_val:
+                is_same_category = True
+
+            if is_same_category:
+                all_candidates.append(c)
+
+        ranked_results = []
+
+        for candidate in all_candidates:
+            c_ing = candidate.get("ingredients", [])
+            c_oil_item = candidate.get("oil_listed", {})
+            c_oil = c_oil_item.get("value", "") if isinstance(c_oil_item, dict) else str(c_oil_item or "")
+            c_nutrition = candidate.get("nutrition", {})
+            c_claims = candidate.get("front_pack_claims", [])
+
+            # 1. Allergy check: exclude NOT SAFE FOR YOU
+            allergy_res = self.check_allergens(c_ing, c_oil, user_allergens)
+            if allergy_res["allergy_status"] == "NOT SAFE FOR YOU":
+                continue
+
+            # 2. Personalised Rating (depends ONLY on nutrients, health conditions, ingredient risks)
+            nutri_r, _ = self.calculate_nutrient_rating(c_nutrition, selected_conditions)
+            ing_r, top_ing, worst_fl = self.calculate_ingredient_rating(c_ing, c_oil, selected_conditions)
+            prod_r, _, _ = self.calculate_product_rating(nutri_r, ing_r)
+
+            if prod_r is None:
+                continue
+
+            # 3. Count contradicted / misleading claims for tie-breaking
+            flagged_claims_count = sum(
+                1 for cl in (c_claims or [])
+                if str(cl.get("audit_verdict", "")).upper() in ["CONTRADICTED", "MISLEADING"]
+            )
+
+            # 4. Reason in plain words using nutrient and ingredient findings only
+            reasons = []
+            c_sat_fat = c_nutrition.get("saturated_fat_g", {})
+            sat_val = c_sat_fat.get("value", 0.0) if isinstance(c_sat_fat, dict) else float(c_sat_fat or 0.0)
+            if sat_val <= 1.5:
+                reasons.append(f"Low saturated fat ({sat_val}g/serve)")
+
+            c_sugars = c_nutrition.get("sugars_g", {})
+            sug_val = c_sugars.get("value", 0.0) if isinstance(c_sugars, dict) else float(c_sugars or 0.0)
+            if sug_val <= 3.0:
+                reasons.append(f"Low sugar ({sug_val}g/serve)")
+
+            c_sodium = c_nutrition.get("sodium_mg", {})
+            sod_val = c_sodium.get("value", 0.0) if isinstance(c_sodium, dict) else float(c_sodium or 0.0)
+            if sod_val <= 300.0:
+                reasons.append(f"Controlled sodium ({sod_val}mg/serve)")
+
+            # Ingredient findings
+            is_palm = False
+            if isinstance(c_oil_item, dict):
+                is_palm = c_oil_item.get("is_palm_oil", False)
+            if not is_palm and "palm" not in c_oil.lower():
+                if c_oil and c_oil.lower() not in ["none declared", "no cooking oil declared"]:
+                    reasons.append(f"Uses {c_oil} instead of palmolein")
                 else:
-                    is_found = term_clean in full_ing_corpus
+                    reasons.append("No palmolein or hydrogenated fat used")
 
-                if is_found:
-                    score -= 35.0
-                    deductions.append({
-                        "type": "avoided_ingredient",
-                        "description": f"Avoided ingredient found: '{avoid_term.title()}'",
-                        "points": -35
-                    })
+            if not worst_fl.get("is_flagged"):
+                reasons.append("Contains no flagged high-risk industrial additives")
 
-            # Check undisclosed oil source (-15)
-            # e.g. "Vegetable Oil" or "Edible Vegetable Oil" without named plant
-            known_plants = ["palmolein", "palm", "sunflower", "soybean", "mustard", "groundnut", "peanut", "rice bran", "sesame", "olive", "coconut", "corn", "canola", "cottonseed"]
-            is_undisclosed = False
-            if oil_clean and oil_clean not in ["none declared", "no cooking oil declared"]:
-                has_veg_oil = "vegetable oil" in oil_clean or "edible oil" in oil_clean
-                has_known_plant = any(kp in oil_clean for kp in known_plants)
-                if has_veg_oil and not has_known_plant:
-                    is_undisclosed = True
+            if not reasons:
+                reasons.append(f"Personalised rating {prod_r}/10 with {sug_val}g sugar and {sat_val}g saturated fat")
 
-            if is_undisclosed:
-                score -= 15.0
-                deductions.append({
-                    "type": "undisclosed_oil",
-                    "description": "Oil source undisclosed on label (e.g. generic 'vegetable oil')",
-                    "points": -15
-                })
+            plain_reason = f"Personalised rating {prod_r}/10. {'; '.join(reasons)}."
 
-            # Check preferred ingredients (+15 each)
-            for pref_term in set(preferred_ingredients):
-                term_clean = pref_term.strip().lower()
-                if term_clean and term_clean in full_ing_corpus:
-                    score += 15.0
-                    deductions.append({
-                        "type": "preferred_ingredient",
-                        "description": f"Preferred ingredient confirmed: '{pref_term.title()}'",
-                        "points": +15
-                    })
+            cand_brand = candidate.get("brand", {})
+            b_val = cand_brand.get("value", "") if isinstance(cand_brand, dict) else str(cand_brand or "")
 
-        # 3. Claims Signals: each CONTRADICTED claim -30; each MISLEADING claim -15
-        for c in (claims or []):
-            verdict = str(c.get("audit_verdict", "")).upper()
-            claim_text = c.get("claim", "Marketing Claim")
-            if "CONTRADICTED" in verdict:
-                score -= 30.0
-                deductions.append({
-                    "type": "contradicted_claim",
-                    "description": f"Contradicted claim: \"{claim_text}\"",
-                    "points": -30
-                })
-            elif "MISLEADING" in verdict:
-                score -= 15.0
-                deductions.append({
-                    "type": "misleading_claim",
-                    "description": f"Misleading claim: \"{claim_text}\"",
-                    "points": -15
-                })
+            cand_name_val = candidate.get("product_name", {})
+            n_val = cand_name_val.get("value", "") if isinstance(cand_name_val, dict) else str(cand_name_val or "")
 
-        # 4. Nutrient Penalty: -(nutrient_rating - 1) * 25/9
-        if nutrient_rating is not None and nutrient_rating > 1.0:
-            nutri_penalty = (nutrient_rating - 1.0) * (25.0 / 9.0)
-            score -= nutri_penalty
-            deductions.append({
-                "type": "nutrient_penalty",
-                "description": f"Nutrient profile penalty (Rating: {nutrient_rating}/10)",
-                "points": -round(nutri_penalty, 1)
+            ranked_results.append({
+                "product_name": n_val,
+                "brand": b_val,
+                "personalised_rating": prod_r,
+                "nutrient_rating": nutri_r,
+                "ingredient_rating": ing_r,
+                "flagged_claims_count": flagged_claims_count,
+                "allergy_status": allergy_res["allergy_status"],
+                "recommendation_reason": plain_reason,
+                "source_url": candidate.get("product_name", {}).get("source_url", "") if isinstance(candidate.get("product_name"), dict) else "",
             })
 
-        clamped_score = int(round(max(0.0, min(100.0, score))))
-
-        return {
-            "personal_match_score": clamped_score,
-            "has_preferences": has_preferences,
-            "preferences_label": "Preferences applied" if has_preferences else "No preferences selected",
-            "deductions": deductions,
-            "starting_score": 100,
-        }
+        # Rank by Personalised Rating (lowest first), break ties by fewer flagged claims
+        ranked_results.sort(key=lambda x: (x["personalised_rating"], x["flagged_claims_count"]))
+        return ranked_results
 
     def evaluate(
         self,
         product_data: Dict[str, Any],
-        selected_conditions: List[str] = None,
-        user_allergens: List[str] = None,
-        preferences: List[str] = None,
-        avoided_ingredients: List[str] = None,
-        preferred_ingredients: List[str] = None,
+        selected_conditions: Optional[List[str]] = None,
+        user_allergens: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
-        Master evaluation pipeline implementing the revised Personalized Rating & Match Score.
+        Master evaluation pipeline implementing Personalised Rating and Allergy Check.
+        Personalised Rating depends ONLY on:
+        - nutrient values vs selected health condition limits and weights
+        - ingredient risk values from ingredient_risks.json (including condition-specific values)
+        - selected health conditions
+        Nothing else may change it: no claim verdicts or secondary signals.
         """
         selected_conditions = selected_conditions or ["general_health"]
         user_allergens = user_allergens or []
-        preferences = preferences or []
-        avoided_ingredients = avoided_ingredients or []
-        preferred_ingredients = preferred_ingredients or []
 
         nutrition = product_data.get("nutrition", {})
         ingredients = product_data.get("ingredients", [])
         oil_info = product_data.get("oil_listed", {})
         oil_declared = oil_info.get("value", "") if isinstance(oil_info, dict) else str(oil_info or "")
-        claims = product_data.get("front_pack_claims", [])
 
         # 1. Allergy Check (Hard Rule)
         allergy_res = self.check_allergens(ingredients, oil_declared, user_allergens)
@@ -528,40 +720,32 @@ class PersonalizedScoringEngine:
         nutri_rating, nutri_breakdown = self.calculate_nutrient_rating(nutrition, selected_conditions)
 
         # 3. Ingredient Rating (1-10, lower = better)
-        ing_rating, top_ingredients, worst_flagged = self.calculate_ingredient_rating(ingredients, oil_declared)
-
-        # 4. Overall Product Rating (1-10)
-        prod_rating, is_partial, partial_reason = self.calculate_product_rating(nutri_rating, ing_rating)
-
-        # 5. Personal Match Score (0-100, preferences only)
-        match_data = self.calculate_personal_match_score(
-            nutrient_rating=nutri_rating,
-            claims=claims,
+        ing_rating, top_ingredients, worst_flagged = self.calculate_ingredient_rating(
             ingredients=ingredients,
             oil_declared=oil_declared,
-            preferences=preferences,
-            avoided_ingredients=avoided_ingredients,
-            preferred_ingredients=preferred_ingredients,
+            selected_conditions=selected_conditions
         )
+
+        # 4. Overall Product Rating (1-10, 0.6 * nutrient + 0.4 * ingredient)
+        prod_rating, is_partial, partial_reason = self.calculate_product_rating(nutri_rating, ing_rating)
 
         _, condition_name, condition_desc = self.merge_conditions(selected_conditions)
 
-        # Hard Rule: If NOT SAFE FOR YOU, show no scores!
+        # Hard Rule: If NOT SAFE FOR YOU, show no rating
         if allergy_res["allergy_status"] == "NOT SAFE FOR YOU":
             return {
                 "allergy_check": allergy_res,
                 "show_scores": False,
+                "show_rating": False,
                 "product_rating": None,
                 "nutrient_rating": None,
                 "ingredient_rating": None,
-                "personal_match_score": None,
                 "selected_conditions": selected_conditions,
                 "conditions_title": condition_name,
                 "conditions_description": condition_desc,
                 "nutrient_breakdown": nutri_breakdown,
                 "top_ingredients": top_ingredients,
                 "worst_flagged": worst_flagged,
-                "match_details": match_data,
                 "is_partial_data": is_partial,
                 "partial_data_note": partial_reason,
             }
@@ -569,17 +753,16 @@ class PersonalizedScoringEngine:
         return {
             "allergy_check": allergy_res,
             "show_scores": True,
+            "show_rating": True,
             "product_rating": prod_rating,
             "nutrient_rating": nutri_rating,
             "ingredient_rating": ing_rating,
-            "personal_match_score": match_data["personal_match_score"],
             "selected_conditions": selected_conditions,
             "conditions_title": condition_name,
             "conditions_description": condition_desc,
             "nutrient_breakdown": nutri_breakdown,
             "top_ingredients": top_ingredients,
             "worst_flagged": worst_flagged,
-            "match_details": match_data,
             "is_partial_data": is_partial,
             "partial_data_note": partial_reason,
         }

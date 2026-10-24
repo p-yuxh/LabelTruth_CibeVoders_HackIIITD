@@ -81,13 +81,13 @@ KNOWN_PRODUCTS = [
 class ProductImageDetector:
     """
     Direct Product Recognition from Uploaded Food Package Images.
-    Uses preprocessed OCR + filename metadata + fuzzy FMCG pattern matching
+    Uses preprocessed OCR + filename metadata + fuzzy FMCG pattern detection
     to identify the exact packaged food product without manual typing.
     """
 
     def detect_product_from_bytes(self, image_bytes: bytes, filename: Optional[str] = None) -> Dict[str, Any]:
         """
-        Takes raw image bytes and optional original filename, runs OCR and pattern matching,
+        Takes raw image bytes and optional original filename, runs OCR and pattern detection,
         and returns the detected product name and OCR text preview.
         """
         try:
@@ -99,12 +99,12 @@ class ProductImageDetector:
         # 1. First check if filename has clear product identifiers
         if filename:
             cleaned_fn = re.sub(r'[-_.]+', ' ', filename).lower()
-            detected_from_fn, source = self._match_product_from_text(cleaned_fn)
-            if source == "pattern_match":
+            detected_from_fn, source = self._detect_product_from_text(cleaned_fn)
+            if source == "pattern_detected":
                 logger.info(f"Identified product from filename metadata: {detected_from_fn}")
                 return {
                     "detected_product": detected_from_fn,
-                    "match_source": "filename_metadata",
+                    "detection_source": "filename_metadata",
                     "text_preview": f"Identified via packaging image: {filename}",
                     "raw_text": cleaned_fn,
                 }
@@ -124,18 +124,18 @@ class ProductImageDetector:
                 except Exception as ex:
                     logger.error(f"OCR totally failed: {ex}")
 
-        # 4. Match OCR text against Indian FMCG knowledge base
-        detected_name, match_source = self._match_product_from_text(raw_text)
+        # 4. Detect OCR text against Indian FMCG knowledge base
+        detected_name, detection_source = self._detect_product_from_text(raw_text)
 
         cleaned_lines = [
             line.strip() for line in raw_text.splitlines() 
-            if len(line.strip()) > 3 and not re.match(r'^[\W\d_]+$', line.strip())
+            if len(line.strip()) > 3 and not re.search(r'^[\W\d_]+$', line.strip())
         ]
         text_preview = " • ".join(cleaned_lines[:5]) if cleaned_lines else "No text recognized"
 
         return {
             "detected_product": detected_name,
-            "match_source": match_source,
+            "detection_source": detection_source,
             "text_preview": text_preview,
             "raw_text": raw_text.strip(),
         }
@@ -153,22 +153,22 @@ class ProductImageDetector:
         except Exception:
             return gray
 
-    def _match_product_from_text(self, text: str) -> Tuple[str, str]:
+    def _detect_product_from_text(self, text: str) -> Tuple[str, str]:
         if not text:
             return "Packaged Food Product", "fallback"
 
         normalized_text = text.lower()
 
-        # 1. Match known patterns
+        # 1. Detect known patterns
         for pattern, product_canonical_name in KNOWN_PRODUCTS:
             if re.search(pattern, normalized_text, re.IGNORECASE):
                 logger.info(f"Identified product: {product_canonical_name} (pattern: {pattern})")
-                return product_canonical_name, "pattern_match"
+                return product_canonical_name, "pattern_detected"
 
         # 2. Extract most prominent text lines (title / headline)
         lines = [
             l.strip() for l in text.splitlines() 
-            if len(l.strip()) >= 4 and not re.match(r'^(?:ingredients|nutrition|mfg|exp|batch|net|wt|mrp|rs|serv|veg).*$', l.strip(), re.IGNORECASE)
+            if len(l.strip()) >= 4 and not re.search(r'^(?:ingredients|nutrition|mfg|exp|batch|net|wt|mrp|rs|serv|veg).*$', l.strip(), re.IGNORECASE)
         ]
 
         if lines:

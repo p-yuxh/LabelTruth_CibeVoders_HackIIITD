@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, AlertTriangle, CheckCircle, ExternalLink, Sliders, ChevronDown, ChevronUp, AlertOctagon } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, CheckCircle, ExternalLink, ChevronDown, ChevronUp, AlertOctagon, ThumbsUp } from 'lucide-react';
 import { calculatePersonalizedScore } from '../services/api';
+import { getRatingStyle } from '../utils/themeHelpers';
+import PersonalizedRatingBar from './PersonalizedRatingBar';
 
 const AVAILABLE_PROFILES = [
   { key: 'general_health', label: 'General Health-Aware', desc: 'ICMR-NIN 2024 everyday nutritional guidelines.' },
@@ -18,17 +20,9 @@ const COMMON_ALLERGENS = [
   'Mustard',
 ];
 
-const PREFERENCE_OPTIONS = [
-  { id: 'avoid_palm_oil', label: 'Avoid Palm Oil' },
-  { id: 'avoid_undisclosed_oil', label: 'Avoid Undisclosed Oil' },
-  { id: 'avoid_artificial_sweeteners', label: 'Avoid Artificial Sweeteners' },
-  { id: 'prefer_whole_grains', label: 'Prefer Whole Grains' },
-];
-
 export default function PersonalizedScoringSection({ productData, initialScoring }) {
   const [selectedConditions, setSelectedConditions] = useState(['general_health']);
   const [selectedAllergens, setSelectedAllergens] = useState([]);
-  const [selectedPreferences, setSelectedPreferences] = useState([]);
   const [scoreData, setScoreData] = useState(initialScoring || null);
   const [loading, setLoading] = useState(false);
   const [showNutrientTable, setShowNutrientTable] = useState(false);
@@ -44,27 +38,17 @@ export default function PersonalizedScoringSection({ productData, initialScoring
     }
   }, [initialScoring]);
 
-  const handleRecalculate = async (conditions, allergens, preferences) => {
+  const handleRecalculate = async (conditions, allergens) => {
     setLoading(true);
     try {
-      const avoided = [];
-      const preferred = [];
-
-      if (preferences.includes('avoid_palm_oil')) avoided.push('palm oil');
-      if (preferences.includes('avoid_artificial_sweeteners')) avoided.push('aspartame', 'acesulfame', 'sucralose');
-      if (preferences.includes('prefer_whole_grains')) preferred.push('whole wheat', 'oats', 'multigrain');
-
       const res = await calculatePersonalizedScore({
         product_data: productData,
         conditions,
         user_allergens: allergens,
-        preferences,
-        avoided_ingredients: avoided,
-        preferred_ingredients: preferred,
       });
       setScoreData(res);
     } catch (err) {
-      console.error('Error recalculating personalized scores:', err);
+      console.error('Error recalculating personalised rating:', err);
     } finally {
       setLoading(false);
     }
@@ -79,7 +63,7 @@ export default function PersonalizedScoringSection({ productData, initialScoring
       next = [...selectedConditions, key];
     }
     setSelectedConditions(next);
-    handleRecalculate(next, selectedAllergens, selectedPreferences);
+    handleRecalculate(next, selectedAllergens);
   };
 
   const toggleAllergen = (item) => {
@@ -87,45 +71,31 @@ export default function PersonalizedScoringSection({ productData, initialScoring
       ? selectedAllergens.filter((a) => a !== item)
       : [...selectedAllergens, item];
     setSelectedAllergens(next);
-    handleRecalculate(selectedConditions, next, selectedPreferences);
-  };
-
-  const togglePreference = (prefId) => {
-    const next = selectedPreferences.includes(prefId)
-      ? selectedPreferences.filter((p) => p !== prefId)
-      : [...selectedPreferences, prefId];
-    setSelectedPreferences(next);
-    handleRecalculate(selectedConditions, selectedAllergens, next);
+    handleRecalculate(selectedConditions, next);
   };
 
   if (!scoreData) return null;
 
   const allergy = scoreData.allergy_check || { allergy_status: 'NONE FOUND', is_safe: true };
   const isNotSafe = allergy.allergy_status === 'NOT SAFE FOR YOU';
-  const showScores = scoreData.show_scores && !isNotSafe;
+  const showRating = scoreData.show_scores && !isNotSafe;
 
   const productRating = scoreData.product_rating;
   const nutrientRating = scoreData.nutrient_rating;
   const ingredientRating = scoreData.ingredient_rating;
-  const matchScore = scoreData.personal_match_score;
-  const matchDetails = scoreData.match_details || {};
 
-  const getRatingBadge = (val) => {
-    if (val === null || val === undefined) return { label: 'N/A', cls: 'badge-muted' };
-    if (val <= 3.5) return { label: 'FAVORABLE (LOW RISK)', cls: 'badge-good' };
-    if (val <= 6.5) return { label: 'MODERATE RISK', cls: 'badge-warning' };
-    return { label: 'HIGH RISK / EXCEEDS LIMITS', cls: 'badge-bad' };
-  };
-
-  const ratingBadge = getRatingBadge(productRating);
+  const productRatingStyle = getRatingStyle(productRating);
+  const nutrientRatingStyle = getRatingStyle(nutrientRating);
+  const ingredientRatingStyle = getRatingStyle(ingredientRating);
+  const recommendations = productData?.recommendations || [];
 
   return (
     <div className="content-card personalized-card">
-      {/* 1. Header & Profile Selector */}
+      {/* 1. Header & Condition Selector */}
       <div className="personalized-header">
         <div>
           <div className="section-eyebrow">Evidence-Based Personalization</div>
-          <h2 className="personalized-title">Health Profile & Preference Evaluation</h2>
+          <h2 className="personalized-title">Personalised Nutrition Evaluation</h2>
           <div className="personalized-subtitle">
             {scoreData.conditions_title || 'General Health-Aware'}
             {selectedConditions.length > 1 && (
@@ -156,7 +126,7 @@ export default function PersonalizedScoringSection({ productData, initialScoring
         </div>
       </div>
 
-      {/* 2. ALLERGY CHECK (Hard Rule: If NOT SAFE, show no scores) */}
+      {/* 2. ALLERGY CHECK (Hard Rule: If NOT SAFE, show no rating) */}
       <div className={`allergy-bar ${isNotSafe ? 'alert-danger' : allergy.allergy_status === 'CANNOT CONFIRM' ? 'alert-warning' : 'alert-safe'}`}>
         <div className="allergy-bar-content">
           {isNotSafe ? (
@@ -193,39 +163,66 @@ export default function PersonalizedScoringSection({ productData, initialScoring
         </div>
       </div>
 
-      {/* IF ALLERGY FAILS: SHOW NO SCORES */}
+      {/* IF ALLERGY FAILS: SHOW NO RATING */}
       {isNotSafe && (
         <div className="safety-suppression-notice">
           <ShieldAlert size={28} style={{ color: '#ffffff', flexShrink: 0 }} />
           <div>
             <h3>NUTRITIONAL RATINGS SUPPRESSED FOR SAFETY</h3>
             <p>
-              This product contains confirmed ingredients matching your declared allergens.
-              Per clinical safety protocols, nutritional fit scores and match ratings are withheld to prevent consumption.
+              This product contains confirmed ingredients declared in your allergen restrictions.
+              Per clinical safety protocols, nutritional ratings are withheld to prevent consumption.
             </p>
           </div>
         </div>
       )}
 
-      {/* 3. SHOW THE TWO DISTINCT SEPARATE SCORES (DO NOT BLEND) */}
-      {showScores && (
-        <div className="two-scores-grid">
-          {/* OUTPUT 1: PERSONALISED RATING (1-10, lower = better) */}
+      {/* 3. PERSONALISED RATING (1-10, lower = better) */}
+      {showRating && (
+        <div className="single-score-panel">
           <div className="score-panel rating-panel">
             <div className="score-panel-top">
               <div>
-                <span className="panel-kicker">OUTPUT 1</span>
+                <span className="panel-kicker">CLINICALLY GUARDED EVALUATION</span>
                 <h3 className="panel-title">Personalised Rating</h3>
                 <span className="scale-hint">(Scale: 1 – 10 • Lower is Better)</span>
               </div>
-              <div className="score-box-large">
-                <span className="score-value-big">{productRating ?? '—'}</span>
-                <span className="score-denom">/ 10</span>
+              <div
+                className="score-box-large"
+                style={{
+                  backgroundColor: productRatingStyle.bg,
+                  color: productRatingStyle.text,
+                  padding: '8px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-end',
+                  justifyContent: 'center',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <span className="score-value-big" style={{ color: productRatingStyle.text }}>
+                    {productRating ?? '—'}
+                  </span>
+                  <span className="score-denom" style={{ color: productRatingStyle.text, opacity: 0.85 }}>
+                    / 10
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: productRatingStyle.text }}>
+                  {productRatingStyle.label}
+                </span>
               </div>
             </div>
 
             <div className="rating-badge-row">
-              <span className={`status-badge-solid ${ratingBadge.cls}`}>{ratingBadge.label}</span>
+              <span
+                className="status-badge-solid"
+                style={{
+                  backgroundColor: productRatingStyle.bg,
+                  color: productRatingStyle.text,
+                }}
+              >
+                {productRating !== null && productRating !== undefined ? `${productRating} / 10 ${productRatingStyle.label}` : productRatingStyle.label}
+              </span>
               {scoreData.is_partial_data && (
                 <span className="partial-data-badge" title={scoreData.partial_data_note}>
                   [PARTIAL DATA]
@@ -233,14 +230,44 @@ export default function PersonalizedScoringSection({ productData, initialScoring
               )}
             </div>
 
+            <PersonalizedRatingBar rating={productRating} />
+
             <div className="component-breakdown-row">
               <div className="sub-component-box">
-                <div className="sub-val">{nutrientRating ?? '—'}<span className="sub-denom">/10</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div className="sub-val">{nutrientRating ?? '—'}<span className="sub-denom">/10</span></div>
+                  <span
+                    style={{
+                      backgroundColor: nutrientRatingStyle.bg,
+                      color: nutrientRatingStyle.text,
+                      padding: '2px 8px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {nutrientRating ?? '—'} / 10 {nutrientRatingStyle.label}
+                  </span>
+                </div>
                 <div className="sub-label">Nutrient Rating (60%)</div>
                 <div className="sub-desc">Weighted r_k with clinical worst-case safety floor</div>
               </div>
               <div className="sub-component-box">
-                <div className="sub-val">{ingredientRating ?? '—'}<span className="sub-denom">/10</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div className="sub-val">{ingredientRating ?? '—'}<span className="sub-denom">/10</span></div>
+                  <span
+                    style={{
+                      backgroundColor: ingredientRatingStyle.bg,
+                      color: ingredientRatingStyle.text,
+                      padding: '2px 8px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {ingredientRating ?? '—'} / 10 {ingredientRatingStyle.label}
+                  </span>
+                </div>
                 <div className="sub-label">Ingredient Rating (40%)</div>
                 <div className="sub-desc">Position-weighted (first=n, last=1) with flagged override</div>
               </div>
@@ -274,22 +301,35 @@ export default function PersonalizedScoringSection({ productData, initialScoring
                     </tr>
                   </thead>
                   <tbody>
-                    {scoreData.nutrient_breakdown?.map((n) => (
-                      <tr key={n.nutrient_key} className={n.r_k > 1 ? 'row-excess' : ''}>
-                        <td><strong>{n.name}</strong></td>
-                        <td>{n.actual}{n.unit}</td>
-                        <td>{n.limit}{n.unit}</td>
-                        <td>{n.excess_pct > 0 ? `+${n.excess_pct}%` : '0%'}</td>
-                        <td><span className={`rk-badge rk-${n.r_k}`}>{n.r_k}/10</span></td>
-                        <td>{n.weight}</td>
-                        <td className="basis-cell">{n.basis}</td>
-                        <td>
-                          <a href={n.source_url} target="_blank" rel="noreferrer" className="citation-anchor">
-                            {n.source_name} <ExternalLink size={10} />
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
+                    {scoreData.nutrient_breakdown?.map((n) => {
+                      const rkStyle = getRatingStyle(n.r_k);
+                      return (
+                        <tr key={n.nutrient_key} className={n.r_k > 1 ? 'row-excess' : ''}>
+                          <td><strong>{n.name}</strong></td>
+                          <td>{n.actual}{n.unit}</td>
+                          <td>{n.limit}{n.unit}</td>
+                          <td>{n.excess_pct > 0 ? `+${n.excess_pct}%` : '0%'}</td>
+                          <td>
+                            <span
+                              className="rk-badge"
+                              style={{
+                                backgroundColor: rkStyle.bg,
+                                color: rkStyle.text,
+                              }}
+                            >
+                              {n.r_k}/10 {rkStyle.label}
+                            </span>
+                          </td>
+                          <td>{n.weight}</td>
+                          <td className="basis-cell">{n.basis}</td>
+                          <td>
+                            <a href={n.source_url} target="_blank" rel="noreferrer" className="citation-anchor">
+                              {n.source_name} <ExternalLink size={10} />
+                            </a>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -321,91 +361,96 @@ export default function PersonalizedScoringSection({ productData, initialScoring
                     </tr>
                   </thead>
                   <tbody>
-                    {scoreData.top_ingredients?.map((ing, idx) => (
-                      <tr key={idx} className={ing.is_flagged ? 'row-excess' : ''}>
-                        <td><strong>{ing.name}</strong></td>
-                        <td>#{ing.position}</td>
-                        <td>{ing.position_weight}</td>
-                        <td><span className={`rk-badge rk-${ing.risk_score}`}>{ing.risk_score}/10</span></td>
-                        <td style={{ fontSize: '0.78rem' }}>{ing.flag_reason}</td>
-                        <td>
-                          <a href={ing.source_url} target="_blank" rel="noreferrer" className="citation-anchor">
-                            {ing.source_name} <ExternalLink size={10} />
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
+                    {scoreData.top_ingredients?.map((ing, idx) => {
+                      const ingRiskStyle = getRatingStyle(ing.risk_score);
+                      return (
+                        <tr key={idx} className={ing.is_flagged ? 'row-excess' : ''}>
+                          <td><strong>{ing.name}</strong></td>
+                          <td>#{ing.position}</td>
+                          <td>{ing.position_weight}</td>
+                          <td>
+                            <span
+                              className="rk-badge"
+                              style={{
+                                backgroundColor: ingRiskStyle.bg,
+                                color: ingRiskStyle.text,
+                              }}
+                            >
+                              {ing.risk_score}/10 {ingRiskStyle.label}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: '0.78rem' }}>{ing.flag_reason}</td>
+                          <td>
+                            <a href={ing.source_url} target="_blank" rel="noreferrer" className="citation-anchor">
+                              {ing.source_name} <ExternalLink size={10} />
+                            </a>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
           </div>
+        </div>
+      )}
 
-          {/* OUTPUT 2: PERSONAL MATCH SCORE (0-100, higher = better, preferences only) */}
-          <div className="score-panel match-panel">
-            <div className="score-panel-top">
-              <div>
-                <span className="panel-kicker">OUTPUT 2</span>
-                <h3 className="panel-title">Personal Match Score</h3>
-                <span className="scale-hint">(Scale: 0 – 100 • Higher is Better • Preferences Only)</span>
-              </div>
-              <div className="score-box-large">
-                <span className="score-value-big">{matchScore ?? '—'}</span>
-                <span className="score-denom">/ 100</span>
-              </div>
+      {/* 4. RECOMMENDATIONS (Same category, safe only, ranked lowest rating first) */}
+      {showRating && recommendations && recommendations.length > 0 && (
+        <div className="recommendations-box">
+          <div className="recommendations-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ThumbsUp size={18} style={{ color: '#ffffff' }} />
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#ffffff' }}>
+                Healthier Category Alternatives
+              </h3>
             </div>
+            <span style={{ fontSize: '0.75rem', color: '#888888', textTransform: 'uppercase' }}>
+              Ranked by Personalised Rating (Lowest First)
+            </span>
+          </div>
 
-            <div className="preferences-status-tag">
-              Status: <strong>{matchDetails.preferences_label || 'No preferences selected'}</strong>
-            </div>
-
-            {/* Preferences Checkboxes */}
-            <div className="preferences-toggles-box">
-              <span className="picker-label">Your Preferences:</span>
-              <div className="prefs-wrap">
-                {PREFERENCE_OPTIONS.map((opt) => {
-                  const checked = selectedPreferences.includes(opt.id);
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      className={`pref-checkbox-btn ${checked ? 'checked' : ''}`}
-                      onClick={() => togglePreference(opt.id)}
-                    >
-                      {checked ? '☑ ' : '☐ '}
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Itemized Audit Ledger behind Personal Match Score */}
-            <div className="ledger-box">
-              <div className="ledger-heading">CALCULATION BREAKDOWN (START: 100)</div>
-              {matchDetails.deductions && matchDetails.deductions.length > 0 ? (
-                <div className="ledger-list">
-                  {matchDetails.deductions.map((d, idx) => (
-                    <div key={idx} className="ledger-row">
-                      <span className="ledger-desc">{d.description}</span>
-                      <span className={`ledger-pts ${d.points < 0 ? 'neg' : 'pos'}`}>
-                        {d.points > 0 ? `+${d.points}` : d.points}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="ledger-row ledger-total">
-                    <strong>Final Clamped Match Score</strong>
-                    <strong>{matchScore} / 100</strong>
+          <div className="recommendations-list">
+            {recommendations.slice(0, 3).map((rec, idx) => (
+              <div key={idx} className="recommendation-item">
+                <div className="rec-header">
+                  <div>
+                    <span className="rec-rank">#{idx + 1} Alternative</span>
+                    <h4 className="rec-title">{rec.product_name}</h4>
+                    <span className="rec-brand">{rec.brand}</span>
                   </div>
+                  {(() => {
+                    const recStyle = getRatingStyle(rec.personalised_rating);
+                    return (
+                      <div
+                        className="rec-score-box"
+                        style={{
+                          backgroundColor: recStyle.bg,
+                          color: recStyle.text,
+                        }}
+                      >
+                        <span className="rec-score-val" style={{ color: recStyle.text }}>
+                          {rec.personalised_rating}
+                        </span>
+                        <span className="rec-score-denom" style={{ color: recStyle.text, opacity: 0.85 }}>
+                          /10
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginLeft: '6px', color: recStyle.text }}>
+                          {recStyle.label}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
-              ) : (
-                <div className="no-prefs-note">
-                  {matchDetails.has_preferences
-                    ? 'All stated ingredient and quality preferences satisfied. No deductions applied.'
-                    : 'No preferences selected. Rating reflects baseline claim and nutrient penalties only.'}
-                </div>
-              )}
-            </div>
+                <p className="rec-reason">{rec.recommendation_reason}</p>
+                {rec.source_url && (
+                  <a href={rec.source_url} target="_blank" rel="noreferrer" className="citation-link" style={{ marginTop: '6px' }}>
+                    <ExternalLink size={11} /> View Alternative Listing
+                  </a>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

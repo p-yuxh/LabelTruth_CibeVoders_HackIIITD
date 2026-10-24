@@ -51,13 +51,7 @@ async def audit_product(
         )
 
     try:
-        # Merge conditions and preferences
         conditions = request.conditions or ([request.profile] if request.profile else ["general_health"])
-        preferences = list(request.preferences or [])
-        if request.strict_palm_oil and "avoid_palm_oil" not in preferences:
-            preferences.append("avoid_palm_oil")
-        if request.goals:
-            preferences.extend(request.goals)
 
         result = await orchestrator.audit_product(
             session=db,
@@ -65,9 +59,6 @@ async def audit_product(
             force_refresh=request.force_refresh,
             conditions=conditions,
             user_allergens=request.user_allergens or [],
-            preferences=preferences,
-            avoided_ingredients=request.avoided_ingredients or [],
-            preferred_ingredients=request.preferred_ingredients or [],
         )
         return result
     except HTTPException:
@@ -83,7 +74,7 @@ async def audit_product(
 @router.post(
     "/detect-image",
     summary="Detect Product from Packaging Image",
-    description="Accepts an uploaded image file of product packaging and extracts the identified product name using OCR & brand matching."
+    description="Accepts an uploaded image file of product packaging and extracts the identified product name using OCR & brand detection."
 )
 async def detect_image(
     file: UploadFile = File(..., description="Image file of the food product packaging (JPEG, PNG, WEBP)"),
@@ -206,26 +197,41 @@ async def get_evidence_log(
 
 @router.post(
     "/score-personal",
-    summary="Instant Personalized Rating & Match Score Calculation",
-    description="Calculates Personalised Rating (1-10, lower=better), Personal Match Score (0-100, preferences only), and Allergy Check."
+    summary="Instant Personalised Rating Calculation",
+    description="Calculates Personalised Rating (1-10, lower=better) and Allergy Check."
 )
 async def score_personal(request: PersonalizeRequest):
     conditions = request.conditions or ([request.profile] if request.profile else ["general_health"])
-    preferences = list(request.preferences or [])
-    if request.strict_palm_oil and "avoid_palm_oil" not in preferences:
-        preferences.append("avoid_palm_oil")
-    if request.goals:
-        preferences.extend(request.goals)
-
     score_result = scoring_engine.evaluate(
         product_data=request.product_data,
         selected_conditions=conditions,
         user_allergens=request.user_allergens or [],
-        preferences=preferences,
-        avoided_ingredients=request.avoided_ingredients or [],
-        preferred_ingredients=request.preferred_ingredients or [],
     )
     return score_result
+
+
+@router.post(
+    "/recommendations",
+    summary="Category Recommendations",
+    description="Rank alternative products in the same category by Personalised Rating, excluding unsafe allergens and breaking ties by fewer misleading or contradicted claims."
+)
+async def get_recommendations(
+    request: PersonalizeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    conditions = request.conditions or ([request.profile] if request.profile else ["general_health"])
+    stmt = select(EvidenceLog).order_by(desc(EvidenceLog.created_at)).limit(50)
+    db_res = await db.execute(stmt)
+    records = db_res.scalars().all()
+    candidate_products = [r.product_data for r in records if r.product_data]
+
+    ranked = scoring_engine.rank_recommendations(
+        current_product=request.product_data,
+        candidate_products=candidate_products,
+        selected_conditions=conditions,
+        user_allergens=request.user_allergens or [],
+    )
+    return ranked
 
 
 @router.get(
@@ -262,4 +268,3 @@ async def health_check():
         "tinyfish_api_configured": bool(settings.TINYFISH_API_KEY),
         "database_url": settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else settings.DATABASE_URL,
     }
-

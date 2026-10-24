@@ -1,6 +1,6 @@
 const API_BASE = '/api';
 
-export async function auditProduct(query, forceRefresh = false, profile = 'general_health', strictPalmOil = false, goals = [], shareOfDaily = 0.15) {
+export async function auditProduct(query, forceRefresh = false, profile = 'general_health', shareOfDaily = 0.15) {
   try {
     const response = await fetch(`${API_BASE}/audit`, {
       method: 'POST',
@@ -11,8 +11,6 @@ export async function auditProduct(query, forceRefresh = false, profile = 'gener
         query,
         force_refresh: forceRefresh,
         profile,
-        strict_palm_oil: strictPalmOil,
-        goals,
         share_of_daily: shareOfDaily,
       }),
     });
@@ -98,22 +96,19 @@ export async function fetchEvidenceLogs(limit = 30, offset = 0) {
 export async function calculatePersonalizedScore(
   productData,
   conditions = ['general_health'],
-  userAllergens = [],
-  preferences = [],
-  avoidedIngredients = [],
-  preferredIngredients = []
+  userAllergens = []
 ) {
   try {
-    // If first argument is an options object
     const payload = productData && typeof productData === 'object' && productData.product_data
-      ? productData
+      ? {
+          product_data: productData.product_data,
+          conditions: productData.conditions || ['general_health'],
+          user_allergens: productData.user_allergens || [],
+        }
       : {
           product_data: productData,
           conditions: Array.isArray(conditions) ? conditions : [conditions || 'general_health'],
           user_allergens: userAllergens,
-          preferences,
-          avoided_ingredients: avoidedIngredients,
-          preferred_ingredients: preferredIngredients,
         };
 
     const response = await fetch(`${API_BASE}/score-personal`, {
@@ -126,7 +121,7 @@ export async function calculatePersonalizedScore(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Failed to compute personalized rating and match score.');
+      throw new Error(errorData.detail || 'Failed to compute personalised rating.');
     }
 
     return await response.json();
@@ -140,26 +135,11 @@ export async function fetchReferenceStandards(shareOfDaily = 0.15) {
   try {
     const response = await fetch(`${API_BASE}/reference-standards?share_of_daily=${shareOfDaily}`);
     if (!response.ok) {
-      throw new Error('Failed to fetch reference standards');
+      throw new Error('Failed to load reference standards knowledge base');
     }
     return await response.json();
   } catch (err) {
     console.error('Error fetching reference standards:', err);
-    throw err;
-  }
-}
-
-export async function checkBackendHealth() {
-  try {
-    const response = await fetch(`${API_BASE}/health`);
-    if (!response.ok) {
-      throw new Error('Backend health check failed');
-    }
-    return await response.json();
-  } catch (err) {
-    if (err.name === 'TypeError' || err.message?.includes('NetworkError') || err.message?.includes('Failed to fetch')) {
-      throw new Error('Cannot connect to backend server. Please ensure FastAPI is running on port 8000.');
-    }
     throw err;
   }
 }

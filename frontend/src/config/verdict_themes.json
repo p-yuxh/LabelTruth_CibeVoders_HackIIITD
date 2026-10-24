@@ -1,0 +1,27 @@
+{
+  "VERIFIED": {
+    "label": "VERIFIED",
+    "icon": "CheckCircle2",
+    "bg": "var(--verdict-verified)",
+    "text": "var(--verdict-text)"
+  },
+  "MISLEADING": {
+    "label": "MISLEADING",
+    "icon": "AlertTriangle",
+    "bg": "var(--verdict-misleading)",
+    "text": "var(--verdict-text)"
+  },
+  "CONTRADICTED": {
+    "label": "CONTRADICTED",
+    "icon": "XCircle",
+    "bg": "var(--verdict-contradicted)",
+    "text": "var(--verdict-text)"
+  },
+  "NO EVIDENCE": {
+    "label": "NO EVIDENCE",
+    "icon": "HelpCircle",
+    "bg": "var(--verdict-no-evidence)",
+    "text": "var(--verdict-text)"
+  }
+}
+

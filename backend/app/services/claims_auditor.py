@@ -51,13 +51,9 @@ class LabelTruthClaimsAuditor:
         tinyfish_data: Dict[str, Any],
         conditions: Optional[List[str]] = None,
         user_allergens: Optional[List[str]] = None,
-        preferences: Optional[List[str]] = None,
-        avoided_ingredients: Optional[List[str]] = None,
-        preferred_ingredients: Optional[List[str]] = None,
         profile: str = "general_health",
-        strict_palm_oil: bool = False,
-        goals: Optional[List[str]] = None,
         share_of_daily: float = 0.15,
+        **kwargs,
     ) -> Dict[str, Any]:
         product_url = tinyfish_data.get("target_product_url", "https://blinkit.com")
         lab_url = tinyfish_data.get("target_lab_url", "https://consumervoice.org")
@@ -65,13 +61,7 @@ class LabelTruthClaimsAuditor:
         fetched_pages = tinyfish_data.get("fetched_pages", [])
         search_results = tinyfish_data.get("search_results", [])
 
-        # Backward compatibility for legacy arguments
         selected_conditions = conditions or ([profile] if profile else ["general_health"])
-        user_pref = list(preferences or [])
-        if strict_palm_oil and "avoid_palm_oil" not in user_pref:
-            user_pref.append("avoid_palm_oil")
-        if goals:
-            user_pref.extend(goals)
 
         # 1. Product & Brand identification
         product_name = self._extract_product_name(query, agent_data, search_results)
@@ -99,7 +89,7 @@ class LabelTruthClaimsAuditor:
         # 5. Lab-Test / Regulatory Coverage Summary (Consumer Voice, Trustified)
         lab_coverage = self._summarize_lab_coverage(search_results, lab_url)
 
-        # 6. Personalized Scoring Engine (New 1-10 Personalised Rating & 0-100 Match Score)
+        # 6. Personalized Scoring Engine (Personalised Rating 1-10)
         scoring_engine = PersonalizedScoringEngine()
         personalized_eval = scoring_engine.evaluate(
             product_data={
@@ -110,9 +100,6 @@ class LabelTruthClaimsAuditor:
             },
             selected_conditions=selected_conditions,
             user_allergens=user_allergens or [],
-            preferences=user_pref,
-            avoided_ingredients=avoided_ingredients or [],
-            preferred_ingredients=preferred_ingredients or [],
         )
 
         # 7. Statutory Reference Standards Registry
@@ -465,7 +452,7 @@ class LabelTruthClaimsAuditor:
                     reason = "Micronutrients are chemically fortified, but the overall food vehicle contains high sugar or palmolein."
                 else:
                     verdict = "VERIFIED"
-                    reason = "Declared micronutrients match statutory fortification levels in a balanced carrier."
+                    reason = "Declared micronutrients meet statutory fortification levels in a balanced carrier."
 
             # H. Marketing Slogans & Taglines
             else:

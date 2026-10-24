@@ -9,7 +9,12 @@
       "source_name": "FSSAI (Food Safety and Standards - Prohibition and Restrictions on Sales) Regulations",
       "source_url": "https://www.fssai.gov.in",
       "access_date": "2026-10-24",
-      "statutory_status": "Statutory Gazette Prohibition"
+      "statutory_status": "Statutory Gazette Prohibition",
+      "condition_risks": {
+        "diabetes": 10,
+        "hypertension": 10,
+        "general_health": 10
+      }
     },
     {
       "pattern": "palmolein|palm oil|fractionated palm|palm kernel|edible vegetable oil \\(palm\\)",
@@ -20,7 +25,12 @@
       "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024",
       "source_url": "https://www.nin.res.in",
       "access_date": "2026-10-24",
-      "statutory_status": "Official Dietary Guideline"
+      "statutory_status": "Official Dietary Guideline",
+      "condition_risks": {
+        "hypertension": 9,
+        "diabetes": 8,
+        "general_health": 8
+      }
     },
     {
       "pattern": "high fructose corn syrup|hfcs|liquid glucose|invert sugar syrup",
@@ -31,7 +41,11 @@
       "source_name": "ICMR-NIN Dietary Guidelines for Indians, 2024 & WHO Guideline: Sugars intake for adults and children",
       "source_url": "https://www.who.int",
       "access_date": "2026-10-24",
-      "statutory_status": "Official Dietary Guideline"
+      "statutory_status": "Official Dietary Guideline",
+      "condition_risks": {
+        "diabetes": 10,
+        "general_health": 8
+      }
     },
     {
       "pattern": "aspartame|acesulfame|acesulfame potassium|sucralose|saccharin|neotame",
@@ -42,7 +56,11 @@
       "source_name": "FSSAI Gazette Notification: Labelling and Display Regulations 2020",
       "source_url": "https://www.fssai.gov.in/upload/notifications/2020/12/5fd87c6a0f6adGazette_Notification_Labelling_Display_14_12_2020.pdf",
       "access_date": "2026-10-24",
-      "statutory_status": "Statutory Gazette Mandate"
+      "statutory_status": "Statutory Gazette Mandate",
+      "condition_risks": {
+        "diabetes": 7,
+        "general_health": 6
+      }
     },
     {
       "pattern": "ins 102|ins 110|ins 122|ins 124|ins 133|tartrazine|sunset yellow|allura red|ponceau 4r|caramel iv",
@@ -53,7 +71,10 @@
       "source_name": "FSSAI Food Additives Standards & EFSA Safety Opinions",
       "source_url": "https://www.efsa.europa.eu",
       "access_date": "2026-10-24",
-      "statutory_status": "Official Safety Opinion"
+      "statutory_status": "Official Safety Opinion",
+      "condition_risks": {
+        "general_health": 6
+      }
     },
     {
       "pattern": "ins 621|ins 627|ins 631|ins 635|monosodium glutamate|flavour enhancer",
@@ -64,7 +85,11 @@
       "source_name": "FSSAI Food Additives Regulations",
       "source_url": "https://www.fssai.gov.in",
       "access_date": "2026-10-24",
-      "statutory_status": "Statutory Food Standard"
+      "statutory_status": "Statutory Food Standard",
+      "condition_risks": {
+        "hypertension": 7,
+        "general_health": 5
+      }
     },
     {
       "pattern": "ins 211|ins 202|ins 220|sodium benzoate|potassium sorbate|sulphur dioxide",
@@ -75,15 +100,11 @@
       "source_name": "FSSAI (Food Products Standards and Food Additives) Regulations",
       "source_url": "https://www.fssai.gov.in",
       "access_date": "2026-10-24",
-      "statutory_status": "Statutory Standard"
+      "statutory_status": "Statutory Standard",
+      "condition_risks": {
+        "general_health": 5
+      }
     }
   ],
-  "default_safe_risk_score": 1,
-  "undisclosed_oil_penalty": 15,
-  "avoided_ingredient_penalty": 35,
-  "preferred_ingredient_bonus": 15,
-  "contradicted_claim_penalty": 30,
-  "misleading_claim_penalty": 15,
-  "nutrient_penalty_multiplier": 2.777777778
+  "default_safe_risk_score": 1
 }
-
