@@ -658,5 +658,65 @@
     "accepted_count": 0,
     "unverified_count": 0,
     "timestamp": "2026-10-25T04:47:56.263384+00:00"
+  },
+  {
+    "query": "lays",
+    "product_name": "Lay's: Home",
+    "brand": "Lay's (PepsiCo)",
+    "category": "Savory Packaged Snack",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T05:06:23.362590+00:00"
+  },
+  {
+    "query": "lays",
+    "product_name": "Lay's: Home",
+    "brand": "Lay's (PepsiCo)",
+    "category": "Savory Packaged Snack",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T05:11:27.478400+00:00"
+  },
+  {
+    "query": "lays",
+    "product_name": "Lay's: Home",
+    "brand": "Lay's (PepsiCo)",
+    "category": "Savory Packaged Snack",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T05:20:47.466263+00:00"
+  },
+  {
+    "query": "lays",
+    "product_name": "Lay's: Home",
+    "brand": "Lay's (PepsiCo)",
+    "category": "Savory Packaged Snack",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T05:22:20.011022+00:00"
   }
 ]
