@@ -265,6 +265,10 @@ function MainApp() {
           onSearch={handleSearch}
           onBack={() => setAuditResult(null)}
           onOpenEvidenceLogs={() => setEvidenceModalOpen(true)}
+          onOpenAuth={openAuth}
+          onOpenAccount={() => setAccountModalOpen(true)}
+          isLoggedIn={isLoggedIn}
+          user={user}
           loading={loading}
         />
       ) : (

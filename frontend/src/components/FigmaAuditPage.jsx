@@ -6,6 +6,10 @@ export default function FigmaAuditPage({
   onSearch,
   onBack,
   onOpenEvidenceLogs,
+  onOpenAuth,
+  onOpenAccount,
+  isLoggedIn,
+  user,
   loading = false,
 }) {
   const [query, setQuery] = useState(auditData?.productName || auditData?.query || '');
@@ -48,7 +52,7 @@ export default function FigmaAuditPage({
   return (
     <main className="audit-page">
       {/* Header */}
-      <header className="audit-header">
+      <header className="audit-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <button className="audit-brand" onClick={onBack} aria-label="Back to home">
           <b>LT</b>
           <span>
@@ -56,13 +60,34 @@ export default function FigmaAuditPage({
             <small>Packaged food claims &amp; ingredients auditor</small>
           </span>
         </button>
-        <button
-          className="audit-history"
-          onClick={onOpenEvidenceLogs}
-          type="button"
-        >
-          Search history
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            className="audit-history"
+            onClick={onOpenEvidenceLogs}
+            type="button"
+          >
+            Search history
+          </button>
+          {isLoggedIn ? (
+            <button
+              className="audit-history"
+              type="button"
+              onClick={onOpenAccount}
+              style={{ background: '#e4f3da', color: '#2f6120', borderColor: '#8fbb73' }}
+            >
+              {user?.full_name ? user.full_name.split(' ')[0] : 'Account'}
+            </button>
+          ) : (
+            <button
+              className="audit-history"
+              type="button"
+              onClick={() => onOpenAuth && onOpenAuth('login')}
+              style={{ background: '#173018', color: '#ffffff', borderColor: '#173018' }}
+            >
+              Log in
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="audit-wrap">
