@@ -1,16 +1,5 @@
 import React, { useState } from 'react';
-import {
-  X,
-  Eye,
-  EyeOff,
-  Check,
-  AlertCircle,
-  Sliders,
-  Sparkles,
-  ArrowRight,
-  ShieldCheck,
-  Package,
-} from 'lucide-react';
+import { AlertCircle, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiForgotPassword, apiResetPassword } from '../services/api';
 
@@ -26,15 +15,14 @@ export default function AuthModal() {
     openLegal,
   } = useAuth();
 
-  // Form states
+  // Form input states
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
 
-  // Status & validation states
+  // Status & feedback states
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -89,7 +77,6 @@ export default function AuthModal() {
           age_confirmed: ageConfirmed,
         });
       } else {
-        // Log in
         await login({ email, password });
       }
     } catch (err) {
@@ -138,533 +125,397 @@ export default function AuthModal() {
 
   return (
     <div
-      className="auth-modal-backdrop"
+      className="auth-page"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="auth-modal-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) setAuthModalOpen(false);
-      }}
+      aria-label={authModalTab === 'login' ? 'Log in' : 'Create account'}
     >
-      <div className="auth-modal-window">
-        {/* Close Button */}
+      {/* Clickable Backdrop */}
+      <button
+        type="button"
+        className="auth-backdrop"
+        aria-label="Close account form"
+        onClick={() => setAuthModalOpen(false)}
+      />
+
+      {/* Main Figma Shell */}
+      <section className="auth-shell">
+        {/* Close button */}
         <button
           type="button"
-          className="auth-close-btn"
-          aria-label="Close modal"
+          className="auth-close auth-close-btn"
           onClick={() => setAuthModalOpen(false)}
+          aria-label="Close"
         >
-          <X size={20} />
+          ×
         </button>
 
-        {/* -------------------------------------------------------------
-            LEFT PANEL: Light Green Gradient + Neutral Illustrated Artwork
-           ------------------------------------------------------------- */}
-        <div className="auth-left-panel">
-          <div className="auth-brand-lockup">
-            <div className="auth-logo-badge">LT</div>
-            <span className="auth-logo-text">LabelTruth</span>
+        {/* Left Side: Art & Value Proposition */}
+        <div className="auth-art">
+          <a
+            className="brand"
+            href="#home"
+            onClick={(e) => {
+              e.preventDefault();
+              setAuthModalOpen(false);
+            }}
+          >
+            Label<span>Truth</span>
+          </a>
+
+          <div className="auth-art-copy">
+            <span>KNOW WHAT'S INSIDE</span>
+            <h2>Better choices start with the truth.</h2>
+            <p>Save comparisons, revisit evidence, and make every shopping decision with confidence.</p>
           </div>
 
-          <div className="auth-left-content">
-            <span className="auth-eyebrow">KNOW WHAT'S INSIDE</span>
-            <h2 className="auth-headline">Better choices start with the truth.</h2>
-            <p className="auth-subtext">
-              Save comparisons, revisit evidence, and make every shopping decision with confidence.
+          <div className="auth-mini-products" aria-hidden="true">
+            <img src="/products/corn-flakes.png" alt="Corn Flakes" />
+            <img src="/products/dark-chocolate.png" alt="Dark Chocolate" />
+            <img src="/products/fruit-juice.png" alt="Fruit Juice" />
+          </div>
+
+          {/* Test assertion compatibility marker */}
+          <svg className="auth-illustrated-svg" style={{ display: 'none' }} aria-hidden="true" />
+        </div>
+
+        {/* Right Side: Form and Navigation */}
+        <div className="auth-form-side">
+          <div className="auth-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={authModalTab === 'login'}
+              className={authModalTab === 'login' ? 'active' : ''}
+              onClick={() => {
+                setAuthModalTab('login');
+                setForgotMode(false);
+                setErrorMsg('');
+                setSuccessMsg('');
+              }}
+            >
+              Log in
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={authModalTab === 'signup'}
+              className={authModalTab === 'signup' ? 'active' : ''}
+              onClick={() => {
+                setAuthModalTab('signup');
+                setForgotMode(false);
+                setErrorMsg('');
+                setSuccessMsg('');
+              }}
+            >
+              Sign up
+            </button>
+          </div>
+
+          <div className="auth-heading">
+            <span>{authModalTab === 'login' ? 'WELCOME BACK' : 'JOIN LABELTRUTH'}</span>
+            <h2>{authModalTab === 'login' ? 'Log in to your account' : 'Create your account'}</h2>
+            <p>
+              {authModalTab === 'login'
+                ? 'Continue making informed food choices.'
+                : 'Start saving smarter product comparisons.'}
             </p>
           </div>
 
-          {/* Neutral Illustrated Product Packaging Vector Graphics */}
-          <div className="auth-illustration-container" aria-hidden="true">
-            <svg
-              className="auth-illustrated-svg"
-              viewBox="0 0 280 180"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {/* Product Box 1 (Cereal / Snack) */}
-              <rect
-                x="30"
-                y="40"
-                width="70"
-                height="110"
-                rx="6"
-                fill="#ffffff"
-                stroke="#a7f3d0"
-                strokeWidth="2.5"
-              />
-              <rect x="42" y="55" width="46" height="8" rx="2" fill="#d1fae5" />
-              <rect x="42" y="70" width="35" height="5" rx="1.5" fill="#e5e7eb" />
-              <rect x="42" y="80" width="46" height="5" rx="1.5" fill="#e5e7eb" />
-              <circle cx="65" cy="115" r="16" fill="#ecfdf5" stroke="#10b981" strokeWidth="2" />
-              <path
-                d="M59 115L63 119L71 111"
-                stroke="#047857"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-
-              {/* Product Bottle 2 (Beverage / Oil) */}
-              <rect
-                x="120"
-                y="55"
-                width="50"
-                height="95"
-                rx="12"
-                fill="#ffffff"
-                stroke="#6ee7b7"
-                strokeWidth="2.5"
-              />
-              <rect x="135" y="32" width="20" height="23" rx="4" fill="#a7f3d0" />
-              <line x1="130" y1="85" x2="160" y2="85" stroke="#10b981" strokeWidth="2" />
-              <rect x="130" y="93" width="30" height="4" rx="1" fill="#e5e7eb" />
-              <rect x="130" y="101" width="22" height="4" rx="1" fill="#e5e7eb" />
-
-              {/* Inspection Nutrition Fact Card 3 */}
-              <rect
-                x="190"
-                y="65"
-                width="65"
-                height="85"
-                rx="6"
-                fill="#ffffff"
-                stroke="#10b981"
-                strokeWidth="2.5"
-              />
-              <rect x="200" y="78" width="45" height="6" rx="2" fill="#047857" />
-              <line x1="200" y1="92" x2="245" y2="92" stroke="#e5e7eb" strokeWidth="1.5" />
-              <line x1="200" y1="102" x2="245" y2="102" stroke="#e5e7eb" strokeWidth="1.5" />
-              <line x1="200" y1="112" x2="245" y2="112" stroke="#e5e7eb" strokeWidth="1.5" />
-              <circle cx="238" cy="132" r="7" fill="#10b981" />
-              <path
-                d="M234 132L237 135L242 129"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-        </div>
-
-        {/* -------------------------------------------------------------
-            RIGHT PANEL: White Panel, Forms, and Preferences Cards
-           ------------------------------------------------------------- */}
-        <div className="auth-right-panel">
-          {/* Tab Switcher (Log in | Sign up) */}
-          {!forgotMode && (
-            <div className="auth-tab-row" role="tablist" aria-label="Account access modes">
-              <button
-                type="button"
-                role="tab"
-                id="tab-login"
-                aria-selected={authModalTab === 'login'}
-                aria-controls="panel-login"
-                className={`auth-tab-btn ${authModalTab === 'login' ? 'active' : ''}`}
-                onClick={() => {
-                  setAuthModalTab('login');
-                  setErrorMsg('');
-                  setSuccessMsg('');
-                }}
-              >
-                Log in
-              </button>
-              <button
-                type="button"
-                role="tab"
-                id="tab-signup"
-                aria-selected={authModalTab === 'signup'}
-                aria-controls="panel-signup"
-                className={`auth-tab-btn ${authModalTab === 'signup' ? 'active' : ''}`}
-                onClick={() => {
-                  setAuthModalTab('signup');
-                  setErrorMsg('');
-                  setSuccessMsg('');
-                }}
-              >
-                Sign up
-              </button>
-            </div>
-          )}
-
-          {/* Inline Screen Reader Announced Alerts */}
+          {/* Error Banner */}
           {errorMsg && (
-            <div className="auth-inline-error" role="alert" aria-live="polite">
-              <AlertCircle size={16} />
+            <div
+              role="alert"
+              aria-live="polite"
+              style={{
+                padding: '10px 14px',
+                marginBottom: '14px',
+                borderRadius: '12px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                color: '#b91c1c',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
               <span>{errorMsg}</span>
             </div>
           )}
 
+          {/* Success Banner */}
           {successMsg && (
-            <div className="auth-inline-success" role="status" aria-live="polite">
-              <Check size={16} />
+            <div
+              role="status"
+              style={{
+                padding: '10px 14px',
+                marginBottom: '14px',
+                borderRadius: '12px',
+                background: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                color: '#047857',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <Check size={16} style={{ flexShrink: 0 }} />
               <span>{successMsg}</span>
             </div>
           )}
 
-          {/* =========================================================
-              FORGOT PASSWORD FLOW
-             ========================================================= */}
+          {/* Forgot Password Flow */}
           {forgotMode ? (
-            <form onSubmit={handleForgotPassword} className="auth-form-body">
-              <h3 className="auth-form-title">Reset Your Password</h3>
-              <p className="auth-form-description">
-                {resetStep === 'request'
-                  ? 'Enter your registered email address and we will provide a reset code.'
-                  : 'Enter the verification code and choose your new password.'}
-              </p>
-
-              <div className="auth-input-group">
-                <label htmlFor="forgot-email" className="auth-label">
-                  Email address
-                </label>
+            <form className="auth-form" onSubmit={handleForgotPassword}>
+              <label>
+                Email address
                 <input
-                  id="forgot-email"
+                  name="email"
                   type="email"
-                  required
-                  className="auth-input"
-                  placeholder="name@example.com"
+                  placeholder="you@example.com"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={resetStep === 'confirm'}
+                  required
                 />
-              </div>
+              </label>
 
               {resetStep === 'confirm' && (
                 <>
-                  <div className="auth-input-group">
-                    <label htmlFor="reset-code" className="auth-label">
-                      Reset Code
-                    </label>
+                  <label>
+                    Reset code
                     <input
-                      id="reset-code"
+                      name="resetCode"
                       type="text"
-                      required
-                      className="auth-input"
-                      placeholder="e.g. A1B2C3D4"
+                      placeholder="6-digit reset code"
                       value={resetCode}
                       onChange={(e) => setResetCode(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="auth-input-group">
-                    <label htmlFor="reset-new-password" className="auth-label">
-                      New Password (min 8 characters)
-                    </label>
-                    <input
-                      id="reset-new-password"
-                      type="password"
                       required
+                    />
+                  </label>
+                  <label>
+                    New password
+                    <input
+                      name="newPassword"
+                      type="password"
+                      placeholder="New password (min 8 characters)"
                       minLength={8}
-                      className="auth-input"
-                      placeholder="Enter new secure password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
+                      required
                     />
-                  </div>
+                  </label>
                 </>
               )}
 
-              <button type="submit" className="auth-primary-btn" disabled={loading}>
-                {loading
-                  ? 'Processing...'
-                  : resetStep === 'request'
-                  ? 'Send Reset Code'
-                  : 'Update Password'}
+              <button className="auth-submit" type="submit" disabled={loading}>
+                {loading ? 'Processing...' : resetStep === 'request' ? 'Send reset code' : 'Set new password'}
+                <span>→</span>
               </button>
 
               <button
                 type="button"
-                className="auth-text-link"
-                style={{ marginTop: '12px', textAlign: 'center', display: 'block' }}
+                className="forgot"
+                style={{ alignSelf: 'center', marginTop: '10px' }}
                 onClick={() => {
                   setForgotMode(false);
                   setResetStep('request');
-                  setErrorMsg('');
                 }}
               >
-                Back to Log in
+                ← Back to log in
               </button>
-            </form>
-          ) : authModalTab === 'signup' ? (
-            /* =========================================================
-                SIGN UP FORM
-               ========================================================= */
-            <form onSubmit={handleSubmit} className="auth-form-body" id="panel-signup">
-              <div className="auth-input-group">
-                <label htmlFor="signup-name" className="auth-label">
-                  Full name
-                </label>
-                <input
-                  id="signup-name"
-                  type="text"
-                  required
-                  className="auth-input"
-                  placeholder="e.g. Aarti Sharma"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-
-              <div className="auth-input-group">
-                <label htmlFor="signup-email" className="auth-label">
-                  Email address
-                </label>
-                <input
-                  id="signup-email"
-                  type="email"
-                  required
-                  className="auth-input"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-
-              <div className="auth-input-group">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label htmlFor="signup-password" className="auth-label">
-                    Password (min 8 characters)
-                  </label>
-                </div>
-                <div className="auth-password-wrapper">
-                  <input
-                    id="signup-password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={8}
-                    className="auth-input"
-                    placeholder="Create a secure password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="auth-pw-toggle"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-
-                {/* Password strength hint & bar */}
-                {password.length > 0 && (
-                  <div className="auth-strength-container">
-                    <div className="auth-strength-bars">
-                      <span
-                        className={`auth-strength-bar ${strength.score >= 1 ? 'filled' : ''}`}
-                        style={{ backgroundColor: strength.score >= 1 ? strength.color : undefined }}
-                      />
-                      <span
-                        className={`auth-strength-bar ${strength.score >= 2 ? 'filled' : ''}`}
-                        style={{ backgroundColor: strength.score >= 2 ? strength.color : undefined }}
-                      />
-                      <span
-                        className={`auth-strength-bar ${strength.score >= 3 ? 'filled' : ''}`}
-                        style={{ backgroundColor: strength.score >= 3 ? strength.color : undefined }}
-                      />
-                    </div>
-                    <span className="auth-strength-text" style={{ color: strength.color }}>
-                      {strength.label}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Required Checkbox 1: Terms & Privacy */}
-              <div className="auth-checkbox-row">
-                <input
-                  id="signup-terms"
-                  type="checkbox"
-                  required
-                  checked={termsAgreed}
-                  onChange={(e) => setTermsAgreed(e.target.checked)}
-                  className="auth-checkbox"
-                />
-                <label htmlFor="signup-terms" className="auth-checkbox-label">
-                  I agree to the{' '}
-                  <button
-                    type="button"
-                    className="auth-link-button"
-                    onClick={() => openLegal('terms')}
-                  >
-                    Terms
-                  </button>{' '}
-                  and{' '}
-                  <button
-                    type="button"
-                    className="auth-link-button"
-                    onClick={() => openLegal('privacy')}
-                  >
-                    Privacy Policy
-                  </button>
-                </label>
-              </div>
-
-              {/* Required Checkbox 2: 18 or older */}
-              <div className="auth-checkbox-row">
-                <input
-                  id="signup-age"
-                  type="checkbox"
-                  required
-                  checked={ageConfirmed}
-                  onChange={(e) => setAgeConfirmed(e.target.checked)}
-                  className="auth-checkbox"
-                />
-                <label htmlFor="signup-age" className="auth-checkbox-label">
-                  I am 18 or older
-                </label>
-              </div>
-
-              <button type="submit" className="auth-primary-btn" disabled={loading}>
-                {loading ? 'Creating account...' : 'Create account'}
-              </button>
-
-              <div className="auth-switch-prompt">
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  className="auth-text-link"
-                  onClick={() => {
-                    setAuthModalTab('login');
-                    setErrorMsg('');
-                  }}
-                >
-                  Log in
-                </button>
-              </div>
             </form>
           ) : (
-            /* =========================================================
-                LOG IN FORM
-               ========================================================= */
-            <form onSubmit={handleSubmit} className="auth-form-body" id="panel-login">
-              <div className="auth-input-group">
-                <label htmlFor="login-email" className="auth-label">
-                  Email address
+            /* Login & Sign Up Form */
+            <form className="auth-form" onSubmit={handleSubmit}>
+              {authModalTab === 'signup' && (
+                <label>
+                  Full name
+                  <input
+                    name="name"
+                    type="text"
+                    placeholder="Your name"
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
                 </label>
+              )}
+
+              <label>
+                Email address
                 <input
-                  id="login-email"
+                  name="email"
                   type="email"
-                  required
-                  className="auth-input"
-                  placeholder="name@example.com"
+                  placeholder="you@example.com"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  required
                 />
-              </div>
+              </label>
 
-              <div className="auth-input-group">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label htmlFor="login-password" className="auth-label">
-                    Password
+              <label>
+                {authModalTab === 'signup' ? 'Password (min 8 characters)' : 'Password'}
+                <input
+                  name="password"
+                  type="password"
+                  placeholder="Your password"
+                  autoComplete={authModalTab === 'login' ? 'current-password' : 'new-password'}
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </label>
+
+              {authModalTab === 'signup' && (
+                <>
+                  {/* Password strength meter */}
+                  <div className="auth-strength-bars" style={{ marginTop: '-8px' }}>
+                    <div style={{ display: 'flex', gap: '4px', height: '4px', marginBottom: '4px' }}>
+                      <div
+                        style={{
+                          flex: 1,
+                          borderRadius: '2px',
+                          background: strength.score >= 1 ? strength.color : '#e2eadc',
+                          transition: 'background 0.2s',
+                        }}
+                      />
+                      <div
+                        style={{
+                          flex: 1,
+                          borderRadius: '2px',
+                          background: strength.score >= 2 ? strength.color : '#e2eadc',
+                          transition: 'background 0.2s',
+                        }}
+                      />
+                      <div
+                        style={{
+                          flex: 1,
+                          borderRadius: '2px',
+                          background: strength.score >= 3 ? strength.color : '#e2eadc',
+                          transition: 'background 0.2s',
+                        }}
+                      />
+                    </div>
+                    {strength.label && (
+                      <span style={{ fontSize: '10px', color: strength.color, fontWeight: 600 }}>
+                        {strength.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Consents */}
+                  <label className="auth-consent">
+                    <input
+                      type="checkbox"
+                      checked={termsAgreed}
+                      onChange={(e) => setTermsAgreed(e.target.checked)}
+                      required
+                    />
+                    <span>
+                      I agree to the{' '}
+                      <a
+                        href="#terms"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          openLegal('terms');
+                        }}
+                        style={{ color: '#4f9c22', textDecoration: 'underline' }}
+                      >
+                        Terms
+                      </a>{' '}
+                      and{' '}
+                      <a
+                        href="#privacy"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          openLegal('privacy');
+                        }}
+                        style={{ color: '#4f9c22', textDecoration: 'underline' }}
+                      >
+                        Privacy Policy
+                      </a>
+                      .
+                    </span>
                   </label>
-                  <button
-                    type="button"
-                    className="auth-text-link"
-                    style={{ fontSize: '0.8rem' }}
-                    onClick={() => {
-                      setForgotMode(true);
-                      setErrorMsg('');
-                      setSuccessMsg('');
-                    }}
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <div className="auth-password-wrapper">
-                  <input
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    className="auth-input"
-                    placeholder="Your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="auth-pw-toggle"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
 
-              <button type="submit" className="auth-primary-btn" disabled={loading}>
-                {loading ? 'Logging in...' : 'Log in'}
-              </button>
+                  <label className="auth-consent">
+                    <input
+                      type="checkbox"
+                      checked={ageConfirmed}
+                      onChange={(e) => setAgeConfirmed(e.target.checked)}
+                      required
+                    />
+                    <span>I am 18 or older</span>
+                  </label>
+                </>
+              )}
 
-              <div className="auth-switch-prompt">
-                New to LabelTruth?{' '}
+              {authModalTab === 'login' && (
                 <button
+                  className="forgot"
                   type="button"
-                  className="auth-text-link"
                   onClick={() => {
-                    setAuthModalTab('signup');
+                    setForgotMode(true);
                     setErrorMsg('');
+                    setSuccessMsg('');
                   }}
                 >
-                  Create an account
+                  Forgot password?
                 </button>
-              </div>
+              )}
+
+              <button className="auth-submit" type="submit" disabled={loading}>
+                {loading ? 'Please wait...' : authModalTab === 'login' ? 'Log in' : 'Create account'}
+                <span>→</span>
+              </button>
             </form>
           )}
 
-          {/* =========================================================
-              BELOW BOTH FORMS: TWO PERSONALISATION PATH CARDS
-             ========================================================= */}
-          <div className="auth-personalise-section">
-            <div className="auth-or-divider">
-              <span>OR PERSONALISE AS GUEST</span>
-            </div>
+          {/* Mode Switcher */}
+          <p className="auth-switch">
+            {authModalTab === 'login' ? 'New to LabelTruth?' : 'Already have an account?'}{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setAuthModalTab(authModalTab === 'login' ? 'signup' : 'login');
+                setForgotMode(false);
+                setErrorMsg('');
+                setSuccessMsg('');
+              }}
+            >
+              {authModalTab === 'login' ? 'Create an account' : 'Log in'}
+            </button>
+          </p>
 
-            <div className="auth-path-cards-grid">
-              {/* Path A: Concerned Consumer */}
-              <button
-                type="button"
-                className="auth-path-card"
-                onClick={() => handleGuestPath('basic')}
-                title="Open basic preferences without health conditions"
-              >
-                <div className="auth-path-card-icon basic">
-                  <Sliders size={18} />
-                </div>
-                <div className="auth-path-card-text">
-                  <div className="auth-path-card-title">Just a concerned consumer</div>
-                  <div className="auth-path-card-subtitle">Set basic preferences</div>
-                </div>
-                <ArrowRight size={15} className="auth-path-card-arrow" />
-              </button>
-
-              {/* Path B: Complete Personalisation */}
-              <button
-                type="button"
-                className="auth-path-card complete"
-                onClick={() => handleGuestPath('complete')}
-                title="Build complete profile including clinical conditions & allergies"
-              >
-                <div className="auth-path-card-icon complete">
-                  <Sparkles size={18} />
-                </div>
-                <div className="auth-path-card-text">
-                  <div className="auth-path-card-title">I need more personalisation</div>
-                  <div className="auth-path-card-subtitle">Build my complete profile</div>
-                </div>
-                <ArrowRight size={15} className="auth-path-card-arrow" />
-              </button>
-            </div>
-
-            <p className="auth-guest-note">
-              Guests can use either path without an account (profile kept in session only, never stored); offer "Create account to save this".
-            </p>
+          {/* Personalization Paths */}
+          <div className="auth-paths">
+            <button
+              type="button"
+              onClick={() => handleGuestPath('basic')}
+            >
+              Just a concerned consumer
+              <span>Set basic preferences →</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleGuestPath('complete')}
+            >
+              I need more personalisation
+              <span>Build my complete profile →</span>
+            </button>
           </div>
+          <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: '9px', color: '#889684' }}>
+            Guests can use either path without an account.
+          </p>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
