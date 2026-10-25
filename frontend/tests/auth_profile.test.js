@@ -98,9 +98,14 @@ describe('Auth & Personalisation Frontend Architecture & Reference Specs', () =>
     const allergiesSec = optionsData.sections.find((s) => s.id === 'allergies');
     const allergyIds = allergiesSec.chips.map((c) => c.id);
     assert.ok(allergyIds.includes('peanuts'));
-    assert.ok(allergyIds.includes('tree_nuts'));
     assert.ok(allergyIds.includes('milk'));
+    assert.ok(allergyIds.includes('eggs'));
+    assert.ok(allergyIds.includes('wheat'));
     assert.ok(allergyIds.includes('gluten'));
+    assert.ok(!allergyIds.includes('tree_nuts'));
+    assert.ok(!allergyIds.includes('soy'));
+    assert.ok(!allergyIds.includes('sesame'));
+    assert.ok(!allergyIds.includes('fish_shellfish'));
 
     const patternSec = optionsData.sections.find((s) => s.id === 'dietary_pattern');
     assert.equal(patternSec.is_single_select, true);

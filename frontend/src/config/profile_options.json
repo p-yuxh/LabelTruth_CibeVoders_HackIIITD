@@ -63,12 +63,6 @@
           "target": "peanuts"
         },
         {
-          "id": "tree_nuts",
-          "label": "Tree nuts",
-          "type": "allergy",
-          "target": "tree_nuts"
-        },
-        {
           "id": "milk",
           "label": "Milk / dairy proteins",
           "type": "allergy",
@@ -81,12 +75,6 @@
           "target": "eggs"
         },
         {
-          "id": "soy",
-          "label": "Soy",
-          "type": "allergy",
-          "target": "soy"
-        },
-        {
           "id": "wheat",
           "label": "Wheat",
           "type": "allergy",
@@ -97,18 +85,6 @@
           "label": "Gluten",
           "type": "allergy",
           "target": "gluten"
-        },
-        {
-          "id": "sesame",
-          "label": "Sesame",
-          "type": "allergy",
-          "target": "sesame"
-        },
-        {
-          "id": "fish_shellfish",
-          "label": "Fish / shellfish",
-          "type": "allergy",
-          "target": "fish_shellfish"
         }
       ]
     },

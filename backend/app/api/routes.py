@@ -255,13 +255,32 @@ async def get_product_alternatives(
     if not conditions:
         conditions = ["general_health"]
 
+    loc = request.location or request.pincode
     return await recommendation_service.get_alternatives(
         searched_product_id=product_id,
         searched_product_data=request.product_data,
         conditions=conditions,
         user_allergens=user_allergens,
+        location=loc,
+        user_id=request.user_id,
         session=db,
     )
+
+
+@router.get(
+    "/alternatives/jobs/{job_id}",
+    response_model=AlternativesResponse,
+    summary="Get Status of Alternatives Live Discovery Job",
+    description="Streams or polls the updated list of alternative candidates as extractions complete."
+)
+async def get_alternatives_job_status(job_id: str):
+    job_data = recommendation_service.get_job_status(job_id)
+    if not job_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Alternatives job '{job_id}' not found or expired.",
+        )
+    return job_data
 
 
 @router.post(

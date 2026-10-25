@@ -241,6 +241,19 @@ export async function fetchProductAlternatives(
   }
 }
 
+export async function fetchAlternativesJobStatus(jobId) {
+  try {
+    const response = await fetch(`${API_BASE}/alternatives/jobs/${jobId}`);
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch (err) {
+    console.warn('Error polling alternatives job:', err);
+    return null;
+  }
+}
+
 export async function fetchReferenceStandards(shareOfDaily = 0.15) {
   try {
     const response = await fetch(`${API_BASE}/reference-standards?share_of_daily=${shareOfDaily}`);

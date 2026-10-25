@@ -31,6 +31,12 @@ class EvidenceLog(Base):
     # Raw output from TinyFish (search, fetch, agent) for auditability
     raw_tinyfish_output = Column(JSON, nullable=True)
     
+    # Source tracking columns for candidate acquisition
+    source_name = Column(String(100), index=True, nullable=True)
+    source_url = Column(String(1000), nullable=True)
+    product_id_at_source = Column(String(255), index=True, nullable=True)
+    fetched_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
+
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
         DateTime, 
@@ -57,6 +63,10 @@ class EvidenceLog(Base):
             "data_completeness": self.data_completeness,
             "product_data": self.product_data,
             "source_urls": self.source_urls,
+            "source_name": self.source_name,
+            "source_url": self.source_url,
+            "product_id_at_source": self.product_id_at_source,
+            "fetched_at": self.fetched_at.isoformat() if self.fetched_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, AlertTriangle, CheckCircle, ExternalLink, ChevronDown, ChevronUp, AlertOctagon, Check, Leaf } from 'lucide-react';
-import { calculatePersonalizedScore, fetchProductAlternatives } from '../services/api';
+import { calculatePersonalizedScore, fetchProductAlternatives, fetchAlternativesJobStatus } from '../services/api';
 import { getRatingStyle } from '../utils/themeHelpers';
 import PersonalizedRatingBar from './PersonalizedRatingBar';
 import { useAuth } from '../context/AuthContext';
@@ -16,12 +16,7 @@ const COMMON_ALLERGENS = [
   'Gluten / Wheat',
   'Milk / Dairy',
   'Peanuts',
-  'Tree Nuts',
   'Eggs',
-  'Soy',
-  'Mustard',
-  'Sesame',
-  'Fish / Shellfish',
 ];
 
 export default function PersonalizedScoringSection({ productData, initialScoring }) {
@@ -72,19 +67,39 @@ export default function PersonalizedScoringSection({ productData, initialScoring
 
   useEffect(() => {
     let isMounted = true;
+    let pollInterval = null;
+
     const fetchAlts = async () => {
       try {
         const productId = productData?.id || productData?.evidence_log_id || 0;
         const res = await fetchProductAlternatives(productId, selectedConditions, selectedAllergens, productData);
         if (isMounted && res) {
           setAlternativesData(res);
+          if (res.status === 'refreshing' && res.job_id) {
+            pollInterval = setInterval(async () => {
+              try {
+                const jobRes = await fetchAlternativesJobStatus(res.job_id);
+                if (isMounted && jobRes) {
+                  setAlternativesData(jobRes);
+                  if (jobRes.status !== 'refreshing') {
+                    clearInterval(pollInterval);
+                  }
+                }
+              } catch (e) {
+                clearInterval(pollInterval);
+              }
+            }, 1200);
+          }
         }
       } catch (e) {
         console.error('Failed to load alternatives', e);
       }
     };
     fetchAlts();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [productData, selectedConditions, selectedAllergens]);
 
   const handleRecalculate = async (conditions, allergens) => {
@@ -540,20 +555,36 @@ export default function PersonalizedScoringSection({ productData, initialScoring
         </div>
       )}
 
-      {/* 4. BETTER OPTIONS FOR YOU (Gated strictly on status === 'ok' || status === 'none_found') */}
-      {alternativesData && (alternativesData.status === 'ok' || alternativesData.status === 'none_found') && (
+      {/* 4. BETTER OPTIONS FOR YOU (Gated strictly on trigger status) */}
+      {alternativesData && (alternativesData.status === 'ok' || alternativesData.status === 'none_found' || alternativesData.status === 'refreshing' || alternativesData.status === 'partial_timeout') && (
         <div className="recommendations-box">
           <div className="recommendations-header">
             <div>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#ffffff' }}>
-                Better options for you
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#ffffff', margin: 0 }}>
+                  Better options for you
+                </h3>
+                {alternativesData.source_label && (
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', background: '#1e293b', padding: '2px 6px', borderRadius: '4px' }}>
+                    {alternativesData.source_label}
+                  </span>
+                )}
+                {alternativesData.status === 'refreshing' && (
+                  <span style={{ fontSize: '0.72rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#34d399' }} />
+                    Checking more options…
+                  </span>
+                )}
+              </div>
               <div style={{ marginTop: '6px', fontSize: '0.8rem', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 {isRatingTrigger && searchedRating != null && (
                   <div>• Rating {searchedRating}/10 for your profile (higher is worse)</div>
                 )}
                 {isAllergenTrigger && (
                   <div>• Contains an allergen on your list: {allergenNames}</div>
+                )}
+                {alternativesData.status === 'partial_timeout' && (
+                  <div style={{ color: '#fbbf24', fontSize: '0.75rem' }}>• {alternativesData.message}</div>
                 )}
               </div>
             </div>

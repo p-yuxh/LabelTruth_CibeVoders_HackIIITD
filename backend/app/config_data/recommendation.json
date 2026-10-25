@@ -4,10 +4,21 @@
   "rating_trigger_threshold": 3,
   "min_rating_improvement": 1,
   "allergen_trigger_max_rating": 3,
-  "max_results": 5,
+  "max_results": 3,
+  "candidate_pool_size": 25,
   "max_per_brand": 2,
-  "candidate_pool_size": 50,
   "min_data_completeness": 0.8,
-  "category_match_level": "subcategory"
+  "category_match_level": "subcategory",
+  "live_discovery_enabled": true,
+  "min_stored_candidates": 15,
+  "live_detail_budget": 8,
+  "live_total_deadline_seconds": 20,
+  "live_call_timeout_seconds": 12,
+  "live_concurrency": 4,
+  "listing_cache_ttl_hours": 6,
+  "detail_cache_ttl_days": 30,
+  "availability_ttl_hours": 6,
+  "max_live_calls_per_user_per_day": 50,
+  "max_live_calls_global_per_day": 500,
+  "allow_cross_source_fallback": false
 }
-

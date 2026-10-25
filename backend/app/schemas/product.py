@@ -94,6 +94,11 @@ class AlternativeProductItem(BaseModel):
     allergen_status: str = "no_listed_user_allergen"
     allergen_statement: str = "No listed user allergens in the ingredients. Always check the pack."
     source_url: str = ""
+    source_name: Optional[str] = None
+    in_stock: Optional[bool] = True
+    image_url: Optional[str] = None
+    price: Optional[Any] = None
+    product_id_at_source: Optional[str] = None
     disclaimer: Optional[str] = None
     data_as_of: str = ""
 
@@ -113,12 +118,15 @@ class SearchedProductSummary(BaseModel):
 
 class AlternativesResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    status: Literal["ok", "none_found", "not_needed", "product_not_in_database"]
+    status: Literal["ok", "none_found", "not_needed", "product_not_in_database", "refreshing", "partial_timeout"]
+    job_id: Optional[str] = None
+    source_label: Optional[str] = None
     trigger: List[str] = Field(default_factory=list)
     trigger_reason: Optional[Literal["rating_threshold", "allergen_conflict", "both"]] = None
     searched_product: SearchedProductSummary
     alternatives: List[AlternativeProductItem] = Field(default_factory=list)
     message: str = ""
+    live_metrics: Optional[Dict[str, Any]] = None
     disclaimer: str = (
         "Ratings are computed for your profile; lower is better. "
         "Always check physical packaging for current ingredients and allergen warnings."
@@ -133,6 +141,9 @@ class AlternativesRequest(BaseModel):
     allergens: Optional[List[str]] = Field(default_factory=list)
     include_reasons: Optional[bool] = True
     product_data: Optional[Dict[str, Any]] = None
+    location: Optional[str] = None
+    pincode: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class ProductAuditData(BaseModel):

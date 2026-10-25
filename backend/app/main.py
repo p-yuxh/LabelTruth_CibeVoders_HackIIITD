@@ -43,9 +43,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API endpoints
+# Include API endpoints (both with and without /api prefix for maximum flexibility)
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+app.include_router(api_router)
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
+app.include_router(auth_router)
 
 
 @app.get("/")

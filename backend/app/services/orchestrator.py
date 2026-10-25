@@ -199,23 +199,49 @@ class AuditOrchestrator:
         cat_val = normalized_data.get("category", {}).get("value") if isinstance(normalized_data.get("category"), dict) else str(normalized_data.get("category") or "")
         subcat_val = normalized_data.get("subcategory", {}).get("value") if isinstance(normalized_data.get("subcategory"), dict) else str(normalized_data.get("subcategory") or "")
 
+        # Extract primary source url and retailer name
+        primary_source_url = tinyfish_result.get("target_product_url") or (source_urls[0] if source_urls else "")
+        source_name = "unknown"
+        u_low = primary_source_url.lower()
+        if "blinkit" in u_low:
+            source_name = "blinkit"
+        elif "zepto" in u_low:
+            source_name = "zepto"
+        elif "bigbasket" in u_low:
+            source_name = "bigbasket"
+        elif "openfoodfacts" in u_low:
+            source_name = "open_food_facts"
+
+        sku = primary_source_url.split("/")[-1] if "/" in primary_source_url else f"sku_{evidence_log.id if 'evidence_log' in locals() else '0'}"
+
         db_product_data = dict(normalized_data)
         db_product_data.pop("recommendations", None)
+        db_product_data["source_name"] = source_name
+        db_product_data["source_url"] = primary_source_url
+        db_product_data["product_id_at_source"] = sku
 
+        now_utc = datetime.now(timezone.utc)
         evidence_log = EvidenceLog(
             query=cleaned_query,
             product_name=product_name,
             brand=brand,
             category=cat_val or None,
             subcategory=subcat_val or None,
+            allergens=normalized_data.get("allergens", []),
+            may_contain_allergens=normalized_data.get("may_contain_allergens", []),
+            data_completeness=normalized_data.get("data_completeness", 1.0),
+            source_name=source_name,
+            source_url=primary_source_url,
+            product_id_at_source=sku,
+            fetched_at=now_utc,
             product_data=db_product_data,
             source_urls=source_urls,
             raw_tinyfish_output={
                 "search_results": tinyfish_result.get("search_results", []),
                 "agent_data": tinyfish_result.get("agent_data", {}),
             },
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=now_utc,
+            updated_at=now_utc,
         )
 
         session.add(evidence_log)
