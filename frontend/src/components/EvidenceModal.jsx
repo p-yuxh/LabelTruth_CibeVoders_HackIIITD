@@ -29,31 +29,32 @@ export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Audit history">
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <History size={20} color="#ffffff" />
+            <History size={20} color="var(--green)" />
             <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.3px', margin: 0 }}>
                 Audit History
               </h3>
-              <p style={{ fontSize: '0.78rem', color: '#a3a3a3' }}>
+              <p style={{ fontSize: '0.78rem', color: '#687565', margin: '2px 0 0' }}>
                 Previously analyzed food products and verified claims.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', color: '#ffffff', cursor: 'pointer' }}
+            style={{ background: 'transparent', border: 'none', color: '#556350', cursor: 'pointer', padding: '4px' }}
+            aria-label="Close"
           >
-            <X size={22} />
+            <X size={20} />
           </button>
         </div>
 
         <div className="modal-body">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <span style={{ fontSize: '0.8rem', color: '#a3a3a3', fontWeight: 600, textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.78rem', color: '#57952d', fontWeight: 800, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
               {logs.length} Audited Products
             </span>
             <button
@@ -61,6 +62,7 @@ export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
               className="btn-icon"
               style={{ padding: '6px 12px', fontSize: '0.75rem' }}
               disabled={loading}
+              type="button"
             >
               <RefreshCw size={12} className={loading ? 'spinner' : ''} />
               <span>Refresh</span>
@@ -68,13 +70,13 @@ export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
           </div>
 
           {error && (
-            <div style={{ color: '#ffffff', fontSize: '0.85rem', padding: '10px 14px', background: '#1c1c1c', border: '1px solid #ffffff' }}>
+            <div className="warning-callout alert" style={{ fontSize: '0.82rem' }}>
               {error}
             </div>
           )}
 
           {logs.length === 0 && !loading && (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#666666', fontSize: '0.9rem' }}>
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#687565', fontSize: '0.88rem' }}>
               No previous audits found. Search for a product to begin auditing.
             </div>
           )}
@@ -89,10 +91,10 @@ export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
               }}
             >
               <div>
-                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff' }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--ink)' }}>
                   {log.product_name || log.query}
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#888888', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '3px' }}>
+                <div style={{ fontSize: '0.78rem', color: '#687565', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '3px' }}>
                   <span>Query: "{log.query}"</span>
                   <span>•</span>
                   <span>{log.brand || 'Brand'}</span>
@@ -102,11 +104,11 @@ export default function EvidenceModal({ isOpen, onClose, onSelectLog }) {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ fontSize: '0.75rem', color: '#666666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#748070', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Clock size={12} />
                   {new Date(log.created_at).toLocaleDateString()}
                 </span>
-                <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                <span style={{ color: 'var(--green)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase' }}>
                   View <ArrowRight size={13} />
                 </span>
               </div>

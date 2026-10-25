@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import Header from './components/Header';
-import SearchSection from './components/SearchSection';
-import CacheStatusBanner from './components/CacheStatusBanner';
-import ProductCard from './components/ProductCard';
+import FigmaLandingPage from './components/FigmaLandingPage';
+import FigmaAuditPage from './components/FigmaAuditPage';
 import EvidenceModal from './components/EvidenceModal';
 import AuthModal from './components/AuthModal';
 import PersonalizeModal from './components/PersonalizeModal';
@@ -11,10 +9,19 @@ import SavedComparisonsModal from './components/SavedComparisonsModal';
 import LegalModal from './components/LegalModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { auditProduct, calculatePersonalizedScore, apiGetIndependentEvidence } from './services/api';
+import { adaptAuditData } from './utils/figmaAdapter';
 import { AlertCircle } from 'lucide-react';
 
 function MainApp() {
-  const { profile } = useAuth();
+  const {
+    user,
+    profile,
+    isLoggedIn,
+    openAuth,
+    setAccountModalOpen,
+    openLegal,
+  } = useAuth();
+
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
   const [error, setError] = useState(null);
@@ -109,10 +116,11 @@ function MainApp() {
       data: pData,
       tinyfish_agent_raw: pData?.tinyfish_agent_raw || null,
     });
+    setEvidenceModalOpen(false);
   };
 
   const handleProfileSaved = async (newProfile) => {
-    // If a product is currently viewed, dynamically re-evaluate the scoring with new profile choices
+    // If a product is currently viewed, dynamically re-evaluate scoring with updated profile choices
     if (auditResult && auditResult.data) {
       try {
         const conditions = (newProfile.dietary_conditions && newProfile.dietary_conditions.length > 0)
@@ -145,75 +153,145 @@ function MainApp() {
     }
   };
 
+  const adaptedAuditData = auditResult ? adaptAuditData(auditResult, profile?.allergies) : null;
+
   return (
-    <div className="desktop-container">
-      {/* Header */}
-      <Header onOpenEvidenceLogs={() => setEvidenceModalOpen(true)} />
-
-      {/* Product Search Bar */}
-      <SearchSection onSearch={handleSearch} loading={loading} />
-
-      {/* Loading Progress State */}
+    <>
+      {/* Loading Modal / Overlay */}
       {loading && (
-        <div className="content-card" style={{ alignItems: 'center', textAlign: 'center', padding: '48px 24px' }}>
-          <div className="spinner" style={{ width: '28px', height: '28px' }} />
-          <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#ffffff', marginTop: '18px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            {loadingStep || 'Auditing packaged food claims...'}
-          </div>
-          <div style={{ fontSize: '0.8rem', color: '#888888', marginTop: '6px' }}>
-            Cross-referencing packaging claims against actual nutrition facts and ingredient statements
+        <div
+          style={{
+            position: 'fixed',
+            zIndex: 999,
+            inset: 0,
+            background: 'rgba(11, 26, 12, 0.7)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+          }}
+        >
+          <div
+            style={{
+              background: '#fbfdf9',
+              border: '1px solid #cfe3c3',
+              borderRadius: '20px',
+              padding: '36px 32px',
+              maxWidth: '480px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 25px 60px rgba(4, 22, 6, 0.3)',
+            }}
+          >
+            <div className="spinner" style={{ width: '36px', height: '36px' }} />
+            <div
+              style={{
+                fontWeight: 800,
+                fontSize: '1rem',
+                color: '#132015',
+                marginTop: '18px',
+                letterSpacing: '-0.3px',
+              }}
+            >
+              {loadingStep || 'Auditing packaged food claims...'}
+            </div>
+            <p
+              style={{
+                fontSize: '0.82rem',
+                color: '#687565',
+                marginTop: '8px',
+                lineHeight: 1.5,
+              }}
+            >
+              Cross-referencing packaging claims against actual nutrition facts and ingredient statements
+            </p>
           </div>
         </div>
       )}
 
-      {/* Empty State before search */}
-      {!auditResult && !loading && !error && (
-        <div className="content-card" style={{ textAlign: 'center', padding: '60px 20px', border: '1px dashed #2a2a2a' }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            No Product Selected
-          </div>
-          <p style={{ fontSize: '0.82rem', color: '#737373', marginTop: '6px', maxWidth: '440px', margin: '6px auto 0 auto' }}>
-            Search for an Indian packaged food item or select a suggestion above to audit front-of-pack claims and personalized suitability.
-          </p>
-        </div>
-      )}
-
-      {/* Error Banner */}
+      {/* Global Error Banner */}
       {error && !loading && (
-        <div className="warning-callout alert">
-          <AlertCircle size={20} style={{ flexShrink: 0, color: '#ffffff' }} />
-          <div>
-            <strong style={{ fontSize: '0.9rem', color: '#ffffff' }}>Audit Notice: </strong>
-            <span style={{ color: '#cccccc' }}>{error}</span>
+        <div
+          style={{
+            position: 'fixed',
+            zIndex: 900,
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'min(640px, calc(100% - 32px))',
+          }}
+        >
+          <div
+            className="warning-callout alert"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <AlertCircle size={20} style={{ color: '#b42318', flexShrink: 0 }} />
+              <div>
+                <b style={{ fontSize: '0.85rem' }}>Audit Notice: </b>
+                <span style={{ fontSize: '0.85rem' }}>{error}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              style={{
+                background: 'none',
+                border: '0',
+                fontSize: '18px',
+                cursor: 'pointer',
+                color: '#666',
+                padding: '0 6px',
+                lineHeight: 1,
+              }}
+              aria-label="Dismiss notice"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}
 
-      {/* Audit Results Dossier */}
-      {auditResult && !loading && (
-        <>
-          {/* Status Banner */}
-          <CacheStatusBanner result={auditResult} />
-
-          {/* Product & Claims Dossier Card */}
-          <ProductCard data={auditResult.data} />
-        </>
+      {/* Screen Views: Audit View vs Landing Page */}
+      {adaptedAuditData ? (
+        <FigmaAuditPage
+          auditData={adaptedAuditData}
+          onSearch={handleSearch}
+          onBack={() => setAuditResult(null)}
+          onOpenEvidenceLogs={() => setEvidenceModalOpen(true)}
+          loading={loading}
+        />
+      ) : (
+        <FigmaLandingPage
+          onSearch={handleSearch}
+          onOpenAuth={openAuth}
+          onOpenAccount={() => setAccountModalOpen(true)}
+          onOpenEvidenceLogs={() => setEvidenceModalOpen(true)}
+          onOpenLegal={openLegal}
+          isLoggedIn={isLoggedIn}
+          user={user}
+          loading={loading}
+        />
       )}
 
-      {/* Audit History Modal */}
-      <EvidenceModal
-        isOpen={evidenceModalOpen}
-        onClose={() => setEvidenceModalOpen(false)}
-        onSelectLog={handleSelectCachedLog}
-      />
-
-      {/* Authentication & Profile Modals */}
+      {/* Modals */}
       <AuthModal />
       <PersonalizeModal onProfileSaved={handleProfileSaved} />
       <AccountModal />
       <SavedComparisonsModal onSelectComparison={(q) => handleSearch(q, false)} />
       <LegalModal />
-    </div>
+      <EvidenceModal
+        isOpen={evidenceModalOpen}
+        onClose={() => setEvidenceModalOpen(false)}
+        onSelectLog={handleSelectCachedLog}
+      />
+    </>
   );
 }
 
