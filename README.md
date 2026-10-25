@@ -15,6 +15,7 @@ An independent platform that verifies the claims, ingredients, and nutrition of 
 ## Table of contents
 
 - [Overview](#overview)
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [How it works](#how-it-works)
 - [Tech stack](#tech-stack)
@@ -39,6 +40,36 @@ Front-of-pack claims such as "Immunity & Strength", "No Added Cane Sugar", or "S
 1. **Is the claim true?** Each claim is classified against FSSAI rules and the product's own nutrition table.
 2. **Is the product good for me?** A base score is adjusted for your health conditions, allergies, and goals.
 3. **Is there independent proof?** Only regulator actions and accredited lab or consumer-body reports are shown, with every link verified server-side.
+
+---
+
+## Screenshots
+
+### 1. Landing Page & Hero Search
+*Clean, consumer-friendly search interface with real-time suggestions and featured product showcase.*
+
+![Landing Page & Hero Search](docs/screenshots/01-landing-page.png)
+
+---
+
+### 2. Product Audit & Dietary Personalisation Strip
+*Live verified evidence status, condition toggles (e.g. Diabetes, Hypertension), and hard allergen safety checks.*
+
+![Product Audit & Personalisation](docs/screenshots/02-audit-overview.png)
+
+---
+
+### 3. Claims Verification & Smarter Swaps
+*Evidence-backed verdict badges, ingredient statements with additive/allergen flags, personalized rating gauge, and healthier alternatives.*
+
+![Claims Verification & Smarter Swaps](docs/screenshots/03-claims-and-swaps.png)
+
+---
+
+### 4. Complete Personalisation Profile (Path B)
+*Granular preferences: clinical dietary conditions, hard-stop allergen safety gates, nutrition goals, and ingredients to avoid.*
+
+![Personalisation Profile Modal](docs/screenshots/04-personalisation-profile.png)
 
 ---
 
