@@ -122,7 +122,31 @@ nav a:hover { color: var(--green); }
 .search:hover, .search:focus-visible { transform: scale(1.035); border-color: #6da844; background: rgba(255,255,255,.96); box-shadow: 0 14px 34px rgba(58, 120, 28, .18); outline: none; }
 .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 12px; }
 .search input::placeholder { color: #72806d; }
-.search-submit { flex: 0 0 auto; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: #4f9c22; color: white; font-size: 19px; cursor: pointer; }
+.search-submit {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #4f9c22;
+  color: white;
+  font-size: 19px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: transform .2s ease, background .2s ease;
+}
+.search-submit:hover {
+  background: #397d1d;
+  transform: scale(1.05);
+}
+.search-submit svg {
+  display: block;
+  margin: auto;
+}
 .eyebrow, .section-heading span { font-size: 11px; letter-spacing: 2px; font-weight: 800; color: #57952d; }
 h1 { font-size: clamp(38px, 5.4vw, 72px); line-height: .98; letter-spacing: -4px; margin: 12px 0; font-weight: 800; }
 h1 em { color: var(--green); font-style: normal; }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Search } from 'lucide-react';
 import FigmaCardSymbol from './FigmaCardSymbol';
 import FigmaComparisonCard from './FigmaComparisonCard';
 
@@ -195,7 +196,11 @@ export default function FigmaLandingPage({
               aria-label="Search product"
               disabled={loading}
             >
-              {loading ? '…' : '⌕'}
+              {loading ? (
+                <span style={{ fontSize: '13px', lineHeight: 1 }}>…</span>
+              ) : (
+                <Search size={14} strokeWidth={2.5} />
+              )}
             </button>
           </form>
         </div>
