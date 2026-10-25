@@ -1,0 +1,76 @@
+{
+  "allowed_sources": {
+    "trustified": {
+      "name": "Trustified",
+      "enabled": true,
+      "allowed_hosts": ["www.trustified.in"],
+      "allowed_path_patterns": [
+        "^/passandfail/[a-zA-Z0-9_-]+/?$",
+        "^/nmr-reports/[a-zA-Z0-9_-]+/?$"
+      ],
+      "disallowed_hosts": ["shop.trustified.in"],
+      "disallowed_path_patterns": [
+        "^/?$",
+        "^/passandfail/?$",
+        "^/nmr-reports/?$"
+      ]
+    },
+    "unbox_health": {
+      "name": "Unbox Health",
+      "enabled": true,
+      "allowed_hosts": [
+        "www.unboxhealth.in",
+        "unboxhealth-production.s3.amazonaws.com"
+      ],
+      "allowed_path_patterns": [
+        "^/explore/product/[a-zA-Z0-9_-]+/[a-f0-9-]{36}/?$",
+        "^/unbox/media/Public_Documents/[a-zA-Z0-9_.-]+\\.pdf$"
+      ],
+      "disallowed_hosts": [],
+      "disallowed_path_patterns": [
+        "^/?$",
+        "^/explore/?$",
+        "^/explore/products-list/?$",
+        "^/explore/brand-list"
+      ]
+    },
+    "consumer_voice": {
+      "name": "Consumer VOICE",
+      "enabled": false
+    },
+    "ministry_of_consumer_affairs": {
+      "name": "Ministry of Consumer Affairs",
+      "enabled": false
+    },
+    "fssai_lab": {
+      "name": "FSSAI (as a lab source)",
+      "enabled": false,
+      "notes": "FSSAI stays only as the fixed rules document source for claim thresholds"
+    },
+    "youtube": {
+      "name": "YouTube",
+      "enabled": false
+    },
+    "social_media": {
+      "name": "Social Media",
+      "enabled": false
+    }
+  },
+  "allowed_hosts": [
+    "www.trustified.in",
+    "www.unboxhealth.in",
+    "unboxhealth-production.s3.amazonaws.com"
+  ],
+  "disallowed_hosts": [
+    "shop.trustified.in"
+  ],
+  "disallowed_path_keywords": [
+    "/explore/brand-list",
+    "/explore/products-list",
+    "/compare",
+    "/search",
+    "/collection"
+  ],
+  "no_report_found_template": "No lab report found for this product on Trustified or Unbox Health (searched {search_date}). This does not mean the product is safe or unsafe."
+}
+

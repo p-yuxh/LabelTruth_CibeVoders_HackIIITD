@@ -1,0 +1,23 @@
+{
+  "collected_at": "2026-10-25T00:00:00Z",
+  "cards": [
+    {
+      "title": "Aashirvaad / Svasti Pure Cow Ghee",
+      "link": "https://www.trustified.in/passandfail/ashirvaadghee",
+      "report_type": "pass_fail",
+      "testing_status": "Failed",
+      "tested_by": "Eurofins",
+      "batch": "KCGA14ECP",
+      "date_published": "2025-07-21"
+    },
+    {
+      "title": "Patanjali Honey",
+      "link": "https://www.trustified.in/nmr-reports/patanjali",
+      "report_type": "nmr",
+      "tested_by": "Eurofins",
+      "batch": "BCM2400071",
+      "date_published": "2025-04-05"
+    }
+  ]
+}
+

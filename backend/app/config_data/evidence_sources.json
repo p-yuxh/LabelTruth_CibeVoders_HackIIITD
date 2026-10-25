@@ -1,59 +1,75 @@
 {
-  "source_tiers": {
-    "tier_a": {
-      "name": "Tier A: Regulators & Government",
-      "description": "Statutory authorities, government ministries, state food safety departments, and official product recall or safety notifications.",
-      "entities": [
-        "FSSAI (Food Safety and Standards Authority of India)",
-        "Ministry of Consumer Affairs",
-        "State Food Safety Administrations",
-        "NCPCR (National Commission for Protection of Child Rights)"
+  "allowed_sources": {
+    "trustified": {
+      "name": "Trustified",
+      "enabled": true,
+      "allowed_hosts": ["www.trustified.in"],
+      "allowed_path_patterns": [
+        "^/passandfail/[a-zA-Z0-9_-]+/?$",
+        "^/nmr-reports/[a-zA-Z0-9_-]+/?$"
       ],
-      "affects_verdict": true,
-      "badge_color": "neutral-dark",
-      "priority": 1
+      "disallowed_hosts": ["shop.trustified.in"],
+      "disallowed_path_patterns": [
+        "^/?$",
+        "^/passandfail/?$",
+        "^/nmr-reports/?$"
+      ]
     },
-    "tier_b": {
-      "name": "Tier B: FSSAI-Notified & NABL-Accredited Labs",
-      "description": "Independent analytical testing laboratories officially notified by FSSAI or listed in the National Accreditation Board for Testing and Calibration Laboratories (NABL) directory with valid scope.",
-      "entities": [
-        "NABL-Accredited Analytical Labs",
-        "FSSAI Notified National Food Laboratories",
-        "CFL (Central Food Laboratory)",
-        "CFTRI (Central Food Technological Research Institute)"
+    "unbox_health": {
+      "name": "Unbox Health",
+      "enabled": true,
+      "allowed_hosts": [
+        "www.unboxhealth.in",
+        "unboxhealth-production.s3.amazonaws.com"
       ],
-      "affects_verdict": true,
-      "badge_color": "neutral-medium",
-      "priority": 2
+      "allowed_path_patterns": [
+        "^/explore/product/[a-zA-Z0-9_-]+/[a-f0-9-]{36}/?$",
+        "^/unbox/media/Public_Documents/[a-zA-Z0-9_.-]+\\.pdf$"
+      ],
+      "disallowed_hosts": [],
+      "disallowed_path_patterns": [
+        "^/?$",
+        "^/explore/?$",
+        "^/explore/products-list/?$",
+        "^/explore/brand-list"
+      ]
     },
-    "tier_c": {
-      "name": "Tier C: Independent Testing Organisations",
-      "description": "Independent consumer advocacy testing organisations and comparative testing platforms. Include Trustified ONLY when the primary underlying laboratory report PDF is attached or directly accessible.",
-      "entities": [
-        "Consumer Voice (consumer-voice.org)",
-        "Ministry of Consumer Affairs Comparative Testing (consumeraffairs.nic.in)",
-        "Centre for Science and Environment (CSE)",
-        "Consumer Education and Research Centre (CERC)",
-        "Trustified (with verified lab report attached)",
-        "Which?",
-        "Consumer Reports"
-      ],
-      "affects_verdict": true,
-      "badge_color": "neutral-subtle",
-      "priority": 3
+    "consumer_voice": {
+      "name": "Consumer VOICE",
+      "enabled": false
     },
-    "tier_d": {
-      "name": "Tier D: Peer-Reviewed Studies & Composition Data",
-      "description": "Peer-reviewed scientific journals, academic studies, and national food composition reference tables (e.g. ICMR-NIN Indian Food Composition Tables). Shown for educational context only; never changes a verdict.",
-      "entities": [
-        "ICMR-NIN Food Composition Tables",
-        "Peer-reviewed Nutrition Science Journals",
-        "Academic Food Safety Theses"
-      ],
-      "affects_verdict": false,
-      "badge_color": "neutral-light",
-      "priority": 4
+    "ministry_of_consumer_affairs": {
+      "name": "Ministry of Consumer Affairs",
+      "enabled": false
+    },
+    "fssai_lab": {
+      "name": "FSSAI (as a lab source)",
+      "enabled": false,
+      "notes": "FSSAI stays only as the fixed rules document source for claim thresholds"
+    },
+    "youtube": {
+      "name": "YouTube",
+      "enabled": false
+    },
+    "social_media": {
+      "name": "Social Media",
+      "enabled": false
     }
-  }
+  },
+  "allowed_hosts": [
+    "www.trustified.in",
+    "www.unboxhealth.in",
+    "unboxhealth-production.s3.amazonaws.com"
+  ],
+  "disallowed_hosts": [
+    "shop.trustified.in"
+  ],
+  "disallowed_path_keywords": [
+    "/explore/brand-list",
+    "/explore/products-list",
+    "/compare",
+    "/search",
+    "/collection"
+  ],
+  "no_report_found_template": "No lab report found for this product on Trustified or Unbox Health (searched {search_date}). This does not mean the product is safe or unsafe."
 }
-

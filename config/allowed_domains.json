@@ -1,16 +1,11 @@
 {
   "allowed_domains": [
-    "consumer-voice.org",
-    "join.consumer-voice.org",
-    "consumeraffairs.nic.in",
+    "www.trustified.in",
+    "trustified.in",
+    "www.unboxhealth.in",
+    "unboxhealth.in",
+    "unboxhealth-production.s3.amazonaws.com",
     "www.fssai.gov.in",
-    "fssai.gov.in",
-    "mail.fssai.gov.in",
-    "nabl-india.org",
-    "www.nin.res.in",
-    "nin.res.in",
-    "amul.com",
-    "yogabars.in"
+    "fssai.gov.in"
   ]
 }
-

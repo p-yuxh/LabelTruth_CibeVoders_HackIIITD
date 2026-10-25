@@ -1,0 +1,302 @@
+[
+  {
+    "query": "Completely Unknown Generic Snack 9999",
+    "product_name": "Generic Snack",
+    "brand": "Unseeded Brand",
+    "category": "",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:19:20.698295+00:00"
+  },
+  {
+    "query": "Completely Unknown Generic Snack 9999",
+    "product_name": "Generic Snack",
+    "brand": "Unseeded Brand",
+    "category": "",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:22:12.513469+00:00"
+  },
+  {
+    "query": "Completely Unknown Generic Snack 9999",
+    "product_name": "Generic Snack",
+    "brand": "Unseeded Brand",
+    "category": "",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:22:47.459244+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:23:53.552731+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:23:54.054424+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:23:54.117360+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:23:54.150031+00:00"
+  },
+  {
+    "query": "Nestle Maggi 2-Minute Noodles",
+    "product_name": "Nestle Maggi 2-Minute Masala Instant Noodles 70g",
+    "brand": "Nestle India",
+    "category": "Instant Noodles",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:23:54.550562+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:23:54.715577+00:00"
+  },
+  {
+    "query": "Lays Potato Chips India",
+    "product_name": "Lay's Classic Salted Potato Chips 50g",
+    "brand": "Lay's (PepsiCo)",
+    "category": "Savory Packaged Snack",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:23:54.803009+00:00"
+  },
+  {
+    "query": "Coca-Cola Zero Sugar Diet Coke",
+    "product_name": "Coca-Cola Zero Sugar Soft Drink Can 300ml",
+    "brand": "The Coca-Cola Company",
+    "category": "Carbonated Beverage",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:23:55.059419+00:00"
+  },
+  {
+    "query": "Completely Unknown Generic Snack 9999",
+    "product_name": "Generic Snack",
+    "brand": "Unseeded Brand",
+    "category": "",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:27:14.889728+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:27:36.692980+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:27:36.957296+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:27:37.010942+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:27:37.044521+00:00"
+  },
+  {
+    "query": "Nestle Maggi 2-Minute Noodles",
+    "product_name": "Nestle Maggi 2-Minute Masala Instant Noodles 70g",
+    "brand": "Nestle India",
+    "category": "Instant Noodles",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:27:37.324986+00:00"
+  },
+  {
+    "query": "Cadbury Bournvita",
+    "product_name": "Cadbury Bournvita Chocolate Health Drink 500g",
+    "brand": "Cadbury / Mondelez",
+    "category": "Malt-based Health Food Drink",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:27:37.487982+00:00"
+  },
+  {
+    "query": "Lays Potato Chips India",
+    "product_name": "Lay's Classic Salted Potato Chips 50g",
+    "brand": "Lay's (PepsiCo)",
+    "category": "Savory Packaged Snack",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:27:37.575085+00:00"
+  },
+  {
+    "query": "Coca-Cola Zero Sugar Diet Coke",
+    "product_name": "Coca-Cola Zero Sugar Soft Drink Can 300ml",
+    "brand": "The Coca-Cola Company",
+    "category": "Carbonated Beverage",
+    "searched_hosts": [
+      "www.trustified.in",
+      "www.unboxhealth.in",
+      "unboxhealth-production.s3.amazonaws.com"
+    ],
+    "searched_at": "25 Oct 2026",
+    "accepted_count": 0,
+    "unverified_count": 0,
+    "timestamp": "2026-10-25T04:27:37.774019+00:00"
+  }
+]

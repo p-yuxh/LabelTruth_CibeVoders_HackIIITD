@@ -12,6 +12,7 @@ from app.services.link_verifier import (
     load_allowed_domains,
     load_source_directory,
     normalize_and_sanitize_url,
+    validate_evidence_url,
     extract_report_date,
     link_verifier,
     LinkVerifier,
@@ -25,15 +26,26 @@ CONFIG_DIR = BASE_DIR / "config_data"
 ROOT_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
 ROOT_CONFIG_DIR = Path(__file__).resolve().parent.parent.parent.parent / "config"
 
+DISABLED_SOURCES = {
+    "consumer_voice",
+    "consumer-voice",
+    "ministry_of_consumer_affairs",
+    "ministry of consumer affairs",
+    "fssai_lab",
+    "fssai as a lab source",
+    "youtube",
+    "social_media",
+    "social",
+}
+
 
 class IndependentEvidenceService:
     """
     Independent Evidence Service for LabelTruth.
-    Manages:
-    1. Independent Lab & Regulatory Evidence (Tier A/B/C/D, strict acceptance rules, report-age flags).
-    2. Link Provenance & Server-side Reachability Verification (numeric source_id, no host-swapping, no invented URLs).
-    3. Claim Verdict Integration (Section 1 only; Personalised Rating & allergy checks are strictly untouched).
-    4. Category-specific Browse Directory integration (source_directory.json, never hardcoded /category/food/).
+    Limited strictly to two independent lab evidence sources:
+      1. Trustified (www.trustified.in)
+      2. Unbox Health (www.unboxhealth.in, unboxhealth-production.s3.amazonaws.com)
+    All other lab evidence sources are disabled.
     """
 
     def __init__(
@@ -70,6 +82,7 @@ class IndependentEvidenceService:
                         "http_status": 200,
                         "final_url": clean_url,
                         "checked_at": now_iso,
+                        "last_verified": now_iso[:10],
                         "error_reason": None,
                         "archived_url": None,
                         "is_restricted": False,
@@ -115,7 +128,7 @@ class IndependentEvidenceService:
         return []
 
     # -------------------------------------------------------------------------
-    # 1. Report Age Computation (at display/eval time)
+    # 1. Report Age Computation
     # -------------------------------------------------------------------------
     def compute_report_age(
         self,
@@ -125,7 +138,6 @@ class IndependentEvidenceService:
     ) -> Tuple[Optional[float], str, str]:
         """
         Computes the age of a report in years relative to current date (or reference date).
-        Age is measured from test_date if known, otherwise publication_date.
         Thresholds:
         - <= 2 years: "recent"
         - > 2 and <= 5 years: "ageing"
@@ -163,7 +175,6 @@ class IndependentEvidenceService:
         else:
             age_years = round(days_diff / 365.25, 2)
 
-        # Exact boundary evaluation: <= 2.0 recent, <= 5.0 ageing, > 5.0 old
         if age_years <= self.recent_max_years:
             age_status = "recent"
         elif age_years <= self.ageing_max_years:
@@ -182,7 +193,7 @@ class IndependentEvidenceService:
         return age_years, age_status, display_text
 
     # -------------------------------------------------------------------------
-    # 2. Acceptance Rules Evaluation (Section 1)
+    # 2. Acceptance Rules Evaluation
     # -------------------------------------------------------------------------
     def evaluate_acceptance_rules(
         self,
@@ -194,20 +205,26 @@ class IndependentEvidenceService:
     ) -> Tuple[str, Optional[str]]:
         """
         Evaluates strict acceptance rules for Section 1:
-        1. Same brand, product, and variant as viewed.
-        2. Same metric as the claim/product checked.
-        3. Original report is accessible (reachable, verified URL), not a news summary.
-        4. Lab is named, and accreditation is stated (accreditation_checked: true/false).
-        5. Method, sample count, and batch or test date stated where available; else 'not stated'.
-        6. Show brand response and regulator action if known.
-        7. Wording is always reported evidence for the tested batch, never proof of wrongdoing.
-        8. Seed entries without verified_by/verified_at are rejected.
-        9. Link provenance: URLs must map to retrieved source_ids and be in allowed_domains.json.
-
-        Returns: (status: "accepted" | "reported_not_verified", reason: Optional[str])
+        1. Source must be Trustified or Unbox Health. Disabled sources are rejected.
+        2. Same brand, product, and variant as viewed.
+        3. Same metric as the claim/product checked.
+        4. Original report is accessible (reachable, verified URL), not a news summary.
+        5. Lab is named, and accreditation is stated.
+        6. URLs must match strict allowed host/path patterns.
         """
+        source_name = (record.get("source_name") or "").lower()
+        source_type = (record.get("source_type") or "").lower()
+        original_url = (record.get("original_report_url") or "").strip()
+
+        # Check disabled sources
+        clean_src = re.sub(r'[^a-z0-9]', '', source_name)
+        clean_type = re.sub(r'[^a-z0-9]', '', source_type)
+        for disabled in DISABLED_SOURCES:
+            clean_dis = re.sub(r'[^a-z0-9]', '', disabled)
+            if clean_dis in clean_src or clean_dis in clean_type or disabled in source_name or disabled in source_type:
+                return "reported_not_verified", "Source disabled: Only Trustified and Unbox Health are enabled for independent lab evidence."
+
         # Rule 0: Seed verification integrity check
-        # Hand-entered lab reports must have verified_by and verified_at
         if record.get("record_id", "").startswith("lab_") and not record.get("is_live_discovery"):
             v_by = record.get("verified_by")
             v_at = record.get("verified_at")
@@ -218,7 +235,6 @@ class IndependentEvidenceService:
         same_product = match.get("same_product", True)
         same_metric = match.get("same_metric", True)
 
-        # Check product match if provided
         p_brand = (record.get("brand") or "").lower()
         p_name = (record.get("product") or "").lower()
         target_brand = brand.lower()
@@ -238,21 +254,15 @@ class IndependentEvidenceService:
         if not same_metric:
             return "reported_not_verified", "Metric mismatch (Rule 2): Tested analytical parameter does not match the product or claim being audited."
 
-        # Cross-product checks (e.g. Milk vs Butter check from requirements)
         if "butter" in target_name and ("milk" in p_name or "raw milk" in str(record.get("parameter", "")).lower()):
             if "butter" not in p_name:
                 return "reported_not_verified", "Product mismatch (Rule 1 & 2): Raw fluid milk surveillance cannot evaluate pasteurised table butter."
 
         # Rule 3: Link Provenance & Server-side Verification
-        original_url = (record.get("original_report_url") or "").strip()
-        discovery_url = (record.get("discovery_url") or "").strip()
-        source_type = (record.get("source_type") or "").lower()
-        source_name = (record.get("source_name") or "").lower()
-
         if not original_url:
             if "trustified" in source_name or "trustified" in source_type:
-                return "reported_not_verified", "Trustified report lacks original laboratory PDF report attachment (Rule 3)."
-            return "reported_not_verified", "Original laboratory report not accessible (Rule 3); secondary news/blog citation only."
+                return "reported_not_verified", "Trustified report lacks original laboratory report attachment (Rule 3)."
+            return "reported_not_verified", "Original laboratory report not accessible (Rule 3); secondary citation only."
 
         # Link Provenance: Check if numeric source_id is required
         source_id = record.get("source_id")
@@ -271,11 +281,16 @@ class IndependentEvidenceService:
             self.diagnostics.log_link_outcome(source_name, source_id, original_url, "dead", url_err)
             return "reported_not_verified", f"Original report URL invalid (Rule 3): {url_err}."
 
+        # Strict evidence URL structure check
+        is_evidence_valid, evidence_err = validate_evidence_url(clean_url)
+        if not is_evidence_valid:
+            self.diagnostics.log_link_outcome(source_name, source_id, clean_url, "dead", evidence_err)
+            return "reported_not_verified", f"Evidence link rejected (Rule 3): {evidence_err}."
+
         record["original_report_url"] = clean_url
         record["final_url"] = clean_url
 
         # Check Link Verification status
-        # If record already has link_status from verifier, use it; otherwise verify
         if "link_status" not in record or not record.get("checked_at"):
             v_res = self.link_verifier.verify_link(
                 url=clean_url,
@@ -284,11 +299,14 @@ class IndependentEvidenceService:
                 report_title=record.get("parameter", ""),
                 source_id=source_id,
                 source_name=record.get("source_name", "Lab Report"),
+                strict_evidence_rules=True,
             )
             record["link_status"] = v_res["link_status"]
             record["http_status"] = v_res.get("http_status")
             record["final_url"] = v_res.get("final_url") or clean_url
             record["checked_at"] = v_res.get("checked_at")
+            record["last_verified"] = v_res.get("last_verified") or (record.get("checked_at") or "")[:10]
+            record["proof_snapshot"] = v_res.get("proof_snapshot")
             record["archived_url"] = v_res.get("archived_url")
             record["is_restricted"] = v_res.get("is_restricted", False)
 
@@ -296,15 +314,13 @@ class IndependentEvidenceService:
         checked_date = (record.get("checked_at") or datetime.now(timezone.utc).isoformat())[:10]
 
         if link_status in ("dead", "error"):
-            # Dead and error links never render as clickable links
             record["original_report_url"] = None
             err_reason = record.get("error_reason") or "Link unreachable"
             return "reported_not_verified", f"Link unavailable (checked {checked_date}): {err_reason}."
 
         if link_status == "restricted":
-            # Restricted links cannot count as accepted evidence on their own
             record["is_restricted"] = True
-            return "reported_not_verified", "Detailed results may require a subscription."
+            return "reported_not_verified", "Detailed results may require a subscription or login."
 
         # Rule 4: Lab named and accreditation stated
         lab_name = (record.get("lab_name") or "").strip().lower()
@@ -314,7 +330,18 @@ class IndependentEvidenceService:
         if "accreditation_checked" not in record:
             record["accreditation_checked"] = False
 
-        # Rule 5: Normalize method/sample/batch strings to 'not stated' if empty
+        if not record.get("accreditation_checked") or record.get("accreditation_no") in ("not stated", "none", "", None):
+            record["non_accredited_note"] = "non-accredited test"
+
+        # Flags & notes
+        if record.get("labs_disagree"):
+            record["disagree_note"] = "labs disagree"
+        if record.get("page_vs_pdf_mismatch"):
+            record["mismatch_note"] = "page vs PDF mismatch"
+        if record.get("batch_mapping_not_confirmed"):
+            record["batch_mapping_note"] = "batch mapping not confirmed"
+
+        # Rule 5: Normalize method/sample/batch strings
         if not record.get("method"):
             record["method"] = "not stated"
         if record.get("sample_count") is None or record.get("sample_count") == "":
@@ -328,10 +355,9 @@ class IndependentEvidenceService:
         if not record.get("regulator_action"):
             record["regulator_action"] = "None on record."
 
-        # Rule 7: Guarantee standard disclaimer presence
+        # Rule 7: Standard disclaimer
         record["disclaimer"] = self.standard_disclaimer
 
-        # Check confidence threshold from extraction pipeline (low confidence -> needs_review)
         conf = float(record.get("confidence", 1.0))
         if conf < 0.6 or record.get("needs_review") is True:
             return "reported_not_verified", "Low extraction confidence or incomplete report extraction; requires manual review."
@@ -339,7 +365,7 @@ class IndependentEvidenceService:
         return "accepted", None
 
     # -------------------------------------------------------------------------
-    # 3. Select Candidate Reports (no "first hit")
+    # 3. Select Candidate Reports
     # -------------------------------------------------------------------------
     def select_best_report_candidate(
         self,
@@ -349,22 +375,6 @@ class IndependentEvidenceService:
         metric: str,
         retrieved_urls_map: Optional[Dict[int, str]] = None,
     ) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
-        """
-        Selects the best report candidate among retrieved results (up to 10):
-        Accept candidate only if ALL are true:
-        1. brand AND product (or variant) appear in the title or body;
-        2. the metric being checked appears in the text;
-        3. it is the original report or a page that links the original (not a news summary);
-        4. a date can be extracted.
-
-        Ranks accepted candidates by:
-        - Tier: regulator (Tier A) > accredited lab (Tier B) > independent organisation (Tier C) > Tier D.
-        - Recency: age in years (ascending).
-        - Match strength: keyword density and title presence.
-
-        Returns: (best_candidate, rejected_candidates_log)
-        If none qualify -> (None, rejected_log) -> verdict NO EVIDENCE. Never falls back to first hit.
-        """
         accepted_candidates = []
         rejected_log = []
 
@@ -381,7 +391,6 @@ class IndependentEvidenceService:
             item_url = (item.get("url") or item.get("original_report_url") or "").strip()
             source_id = item.get("source_id", idx)
 
-            # 1. Provenance check: URL must map to retrieved source_id if map is provided
             if retrieved_urls_map is not None:
                 if source_id not in retrieved_urls_map or retrieved_urls_map[source_id] != item_url:
                     rejected_log.append({
@@ -391,8 +400,6 @@ class IndependentEvidenceService:
                     })
                     continue
 
-            # 2. Check 4 acceptance criteria
-            # Criterion 1: Brand AND product appear in title or body
             brand_in_text = brand_clean in combined_text if brand_clean else True
             prod_tokens = [w for w in re.findall(r'\b\w{3,}\b', prod_clean) if w not in ("with", "pack", "food")]
             prod_in_text = any(t in combined_text for t in prod_tokens) if prod_tokens else True
@@ -405,9 +412,7 @@ class IndependentEvidenceService:
                 })
                 continue
 
-            # Criterion 2: Metric being checked appears in text
             if metric_clean and metric_clean not in combined_text:
-                # Check for metric synonyms (e.g. sugar -> sweetener, sodium -> salt)
                 synonyms = {
                     "sugar": ["sugar", "sugars", "sweetener", "sucrose", "glucose"],
                     "sodium": ["sodium", "salt", "nacl"],
@@ -428,7 +433,6 @@ class IndependentEvidenceService:
                     })
                     continue
 
-            # Criterion 3: Original report or page linking original (NOT a news summary)
             is_news = item.get("is_news_summary", False) or any(
                 n in combined_text for n in ("news summary", "breaking news", "reported by times of india", "ndtv news")
             )
@@ -441,7 +445,6 @@ class IndependentEvidenceService:
                 })
                 continue
 
-            # Criterion 4: Date can be extracted
             extracted_date = extract_report_date(combined_text) or item.get("publication_date") or item.get("test_date")
             if not extracted_date:
                 rejected_log.append({
@@ -451,12 +454,10 @@ class IndependentEvidenceService:
                 })
                 continue
 
-            # Calculate Age and Tier
             age_years, age_status, age_display = self.compute_report_age(extracted_date)
             tier = str(item.get("tier") or "C").upper()
             tier_rank = tier_weights.get(tier, 3)
 
-            # Match strength calculation (title matches score higher)
             relevance_strength = 0
             if brand_clean and brand_clean in title:
                 relevance_strength += 2
@@ -480,7 +481,6 @@ class IndependentEvidenceService:
             logger.info(f"NO_MATCH: None of the {len(candidates)} candidates qualified for '{product_name}' - '{metric}'.")
             return None, rejected_log
 
-        # Rank candidates: 1) Tier (ascending), 2) Recency (ascending age_years), 3) Relevance strength (descending)
         accepted_candidates.sort(key=lambda x: (x["tier_rank"], x["age_years"], -x["relevance_strength"]))
         best = accepted_candidates[0]
         return best, rejected_log
@@ -494,15 +494,10 @@ class IndependentEvidenceService:
         product_name: str = "",
         query: str = ""
     ) -> Optional[Dict[str, Any]]:
-        """
-        Maps a product category to a verified browse link from config/source_directory.json.
-        Returns None if no mapping exists (NO generic /category/food/ fallback).
-        """
         cat_clean = (category or "").strip().lower()
         prod_clean = f"{(product_name or '').lower()} {(query or '').lower()}"
         cat_dict = self.source_directory.get("categories", {})
 
-        # 1. Exact match against category
         if cat_clean and cat_clean in cat_dict:
             entry = cat_dict[cat_clean]
             label = f"Browse Consumer Voice {entry.get('category_label', cat_clean)} reviews (not evidence for this product)"
@@ -513,7 +508,6 @@ class IndependentEvidenceService:
                 "verified_by": entry.get("verified_by"),
             }
 
-        # 2. Substring token match against category
         if cat_clean:
             for key, entry in cat_dict.items():
                 if key in cat_clean or cat_clean in key:
@@ -525,7 +519,6 @@ class IndependentEvidenceService:
                         "verified_by": entry.get("verified_by"),
                     }
 
-        # 3. Match against product keywords (e.g. "Amul Butter" with generic category "Dairy")
         for key in sorted(cat_dict.keys(), key=len, reverse=True):
             if re.search(rf'\b{re.escape(key)}\b', prod_clean):
                 entry = cat_dict[key]
@@ -537,7 +530,6 @@ class IndependentEvidenceService:
                     "verified_by": entry.get("verified_by"),
                 }
 
-        # No category mapping -> no browse link
         return None
 
     # -------------------------------------------------------------------------
@@ -555,16 +547,16 @@ class IndependentEvidenceService:
         retrieved_urls_map: Optional[Dict[int, str]] = None,
     ) -> Dict[str, Any]:
         """
-        Retrieves Independent Lab & Regulatory Evidence records matching viewed product.
-        Guarantees:
-        - URLs are verified and traceable.
-        - Browse links never appear inside evidence cards and carry explicit 'not evidence' label.
-        - Personalised Rating and allergy check are completely untouched.
+        Retrieves Independent Lab evidence strictly from Trustified and Unbox Health.
+        If neither has an accepted record, returns empty list with exact empty-state text.
         """
         q_clean = (query or "").lower().strip()
         p_clean = (product_name or "").lower().strip()
         b_clean = (brand or "").lower().strip()
         combined_text = f"{q_clean} {p_clean} {b_clean}"
+
+        effective_date = ref_date or self.reference_date or datetime.now(timezone.utc).date()
+        date_str_formatted = effective_date.strftime("%d %b %Y")
 
         def has_word(pattern: str, text: str) -> bool:
             return bool(re.search(pattern, text, re.IGNORECASE))
@@ -577,24 +569,13 @@ class IndependentEvidenceService:
             combined_seed = f"{p_seed} {b_seed} {k_seed} {c_seed}"
 
             product_patterns = [
+                (r'\b(ghee|cow\s+ghee|ashirvaad|svasti)\b', r'\b(ghee|cow\s+ghee|ashirvaad|svasti)\b'),
+                (r'\b(honey|patanjali)\b', r'\b(honey|patanjali)\b'),
+                (r'\b(whey|protein|nakpro|isolate)\b', r'\b(whey|protein|nakpro|isolate)\b'),
                 (r'\bbournvita\b', r'\bbournvita\b'),
                 (r'\bmaggi\b', r'\bmaggi\b'),
                 (r'\b(lays?|lay\'s)\b', r'\b(lays?|lay\'s)\b'),
-                (r'\b(coca[\s-]?cola|diet\s+coke|\bcoke\b)\b', r'\b(coca[\s-]?cola|diet\s+coke|\bcoke\b)\b'),
-                (r'\b(butter|amul\s+butter|table\s+butter)\b', r'\b(butter|amul\s+butter|table\s+butter)\b'),
-                (r'\b(yogabar|yoga\s+bar|dark\s+chocolate\s+oats)\b', r'\b(yogabar|yoga\s+bar|dark\s+chocolate\s+oats)\b'),
-                (r'\b(parle[\s-]?g|parle)\b', r'\b(parle[\s-]?g|parle)\b'),
-                (r'\bkurkure\b', r'\bkurkure\b'),
-                (r'\b(kissan|kissan\s+jam)\b', r'\b(kissan|kissan\s+jam)\b'),
-                (r'\bfrooti\b', r'\bfrooti\b'),
-                (r'\b(yippee|yippe)\b', r'\b(yippee|yippe)\b'),
-                (r'\bpaper\s*boat\b', r'\bpaper\s*boat\b'),
-                (r'\bpringles\b', r'\bpringles\b'),
-                (r'\btop\s*ramen\b', r'\btop\s*ramen\b'),
-                (r'\b(nissin|cup\s*noodles)\b', r'\b(nissin|cup\s*noodles)\b'),
-                (r'\bhaldiram\b', r'\bhaldiram\b'),
-                (r'\bgroundnut\s+oil\b', r'\bgroundnut\s+oil\b'),
-                (r'\btoned\s+milk\b', r'\btoned\s+milk\b'),
+                (r'\b(butter|amul\s+butter)\b', r'\b(butter|amul\s+butter)\b'),
             ]
 
             for q_pat, s_pat in product_patterns:
@@ -612,6 +593,13 @@ class IndependentEvidenceService:
 
         for seed in self.lab_seeds:
             item = dict(seed)
+
+            # Strict filtering: Exclude disabled sources completely
+            src_name = (item.get("source_name") or "").lower()
+            src_type = (item.get("source_type") or "").lower()
+            if any(disabled in src_name or disabled in src_type for disabled in DISABLED_SOURCES):
+                continue
+
             if not is_match(item):
                 continue
 
@@ -658,17 +646,64 @@ class IndependentEvidenceService:
             else:
                 unverified_lab.append(item)
 
-        # Browse Link resolution
+        # Log search query
+        try:
+            log_path = self.data_dir / "lab_search_log.json"
+            logs = []
+            if log_path.exists():
+                try:
+                    with open(log_path, "r", encoding="utf-8") as lf:
+                        logs = json.load(lf)
+                        if not isinstance(logs, list):
+                            logs = []
+                except Exception:
+                    logs = []
+            logs.append({
+                "query": query,
+                "product_name": product_name,
+                "brand": brand,
+                "category": category,
+                "searched_hosts": [
+                    "www.trustified.in",
+                    "www.unboxhealth.in",
+                    "unboxhealth-production.s3.amazonaws.com"
+                ],
+                "searched_at": date_str_formatted,
+                "accepted_count": len(accepted_lab),
+                "unverified_count": len(unverified_lab),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+            with open(log_path, "w", encoding="utf-8") as lf:
+                json.dump(logs[-500:], lf, indent=2)
+        except Exception as e:
+            logger.debug(f"Could not write lab_search_log: {e}")
+
+        # Exact empty-state message required by Section 1:
+        empty_state_text = (
+            f"No lab report found for this product on Trustified or Unbox Health (searched {date_str_formatted}). "
+            f"This does not mean the product is safe or unsafe."
+        )
+
+        total_checked = len(accepted_lab) + len(unverified_lab)
+        coverage_status = "FOUND" if accepted_lab else "SEARCHED_NONE_FOUND"
+        coverage_badge_text = f"FOUND ({len(accepted_lab)} report{'s' if len(accepted_lab) > 1 else ''})" if accepted_lab else "SEARCHED_NONE_FOUND"
+
         browse_info = self.get_category_browse_link(category, product_name=product_name, query=query)
         category_browse_url = browse_info["url"] if browse_info else None
         category_browse_text = browse_info["text"] if browse_info else None
 
         return {
             "section_1": {
-                "heading": "Independent lab & regulatory evidence",
+                "heading": "Independent lab evidence (Trustified, Unbox Health)",
                 "accepted": accepted_lab,
                 "reported_not_verified": unverified_lab,
-                "empty_state_text": "No matching lab report found for this product.",
+                "empty_state_text": empty_state_text,
+                "coverage_badge": {
+                    "status": coverage_status,
+                    "badge_text": coverage_badge_text,
+                    "message": empty_state_text if not accepted_lab else f"Found {len(accepted_lab)} verified report(s)",
+                },
+                "summary_view": f"Lab evidence available for {len(accepted_lab)} of {max(1, total_checked)} products",
                 "category_browse_url": category_browse_url,
                 "category_browse_text": category_browse_text,
             }
@@ -685,14 +720,14 @@ class IndependentEvidenceService:
     ) -> List[Dict[str, Any]]:
         """
         Informs claim verdicts strictly using accepted Section 1 evidence:
-        - A Recent report that passes all rules and shows a lab-versus-label gap above tolerance
-          may set CONTRADICTED (lab_gap_pct = (lab - label)/label*100, tolerance in config).
-        - If lab agrees with label within tolerance, it supports VERIFIED.
-        - Old, Date unknown, and Ageing reports are displayed but CANNOT produce
-          a CONTRADICTED verdict on their own. They may only be shown as context.
+        - Material lab disagreements: When two labs disagree materially (e.g. fat 2.21 vs 3.86),
+          withhold CONTRADICTED, set NO EVIDENCE with reason 'labs disagree', showing both values.
+        - Non-accredited tests: cannot set CONTRADICTED; label 'non-accredited test'.
+        - Page vs PDF mismatch: PDF values win.
+        - Informational values: Trustified overall Testing Status, Trustified NMR interpretation text,
+          and Unbox letter rating/score NEVER set a claim verdict.
         - Allowed verdicts strictly remain: VERIFIED, MISLEADING, CONTRADICTED, NO EVIDENCE.
         - Personalised Rating and allergy checks are NEVER modified.
-        - A report with no reachable original link CANNOT be accepted and cannot change any verdict.
         """
         allow_old = self.allow_old_for_verdict if allow_old_for_verdict is None else allow_old_for_verdict
         accepted_reports = evidence.get("section_1", {}).get("accepted", [])
@@ -704,12 +739,10 @@ class IndependentEvidenceService:
 
             matching_report = None
             for rep in accepted_reports:
-                # Ensure report has reachable original URL
                 if not rep.get("original_report_url") or rep.get("link_status") in ("dead", "error", "restricted"):
                     continue
 
                 param = (rep.get("parameter") or "").lower()
-                # Check metric match to this claim
                 if any(w in c_text for w in ["sugar", "sweet", "glucose"]) and any(w in param for w in ["sugar", "sweetener"]):
                     matching_report = rep
                     break
@@ -725,7 +758,7 @@ class IndependentEvidenceService:
                 elif any(w in c_text for w in ["health drink", "energy", "active brain"]) and "health drink" in param:
                     matching_report = rep
                     break
-                elif any(w in c_text for w in ["pure", "purity", "fresh"]) and any(w in param for w in ["fat", "moisture", "standard"]):
+                elif any(w in c_text for w in ["pure", "purity", "fresh"]) and any(w in param for w in ["fat", "moisture", "standard", "purity"]):
                     matching_report = rep
                     break
 
@@ -735,8 +768,16 @@ class IndependentEvidenceService:
                 source_name = matching_report.get("source_name", "Accredited Lab")
                 tier = matching_report.get("tier", "C")
                 rep_url = matching_report.get("final_url") or matching_report.get("original_report_url")
+                report_type = matching_report.get("report_type", "")
+                is_accredited = bool(matching_report.get("accreditation_checked", False))
+                labs_disagree = bool(matching_report.get("labs_disagree", False))
+                page_pdf_mismatch = bool(matching_report.get("page_vs_pdf_mismatch", False))
 
-                # Attach evidence reference to claim
+                # Handle page vs PDF mismatch: PDF values win
+                if page_pdf_mismatch and "pdf_lab_value" in matching_report and matching_report["pdf_lab_value"] is not None:
+                    gap = matching_report.get("pdf_lab_gap_pct", gap)
+
+                # Attach evidence reference
                 c["independent_evidence_ref"] = {
                     "record_id": matching_report.get("record_id"),
                     "source_name": source_name,
@@ -744,11 +785,33 @@ class IndependentEvidenceService:
                     "age_status": age_status,
                     "lab_gap_pct": gap,
                     "original_report_url": rep_url,
+                    "labs_disagree": labs_disagree,
+                    "accreditation_checked": is_accredited,
                 }
 
-                # Evaluate effect on verdict
-                # Case 1: Regulator action in Tier A specifically contradicting health classification
-                if tier == "A" and matching_report.get("regulator_action") and any(w in c_text for w in ["health", "active", "strong"]):
+                # Rule A: Informational-only reports never set a verdict
+                if report_type == "nmr" or matching_report.get("is_letter_rating") or matching_report.get("parameter") in ("Unbox Rating", "Overall Status", "Testing Status"):
+                    # Leave verdict unchanged or NO EVIDENCE
+                    if c.get("audit_verdict") not in ["VERIFIED", "MISLEADING", "CONTRADICTED", "NO EVIDENCE"]:
+                        c["audit_verdict"] = "NO EVIDENCE"
+                    c["reason"] = f"Reported by {source_name}: Informational finding ({matching_report.get('interpretation') or matching_report.get('testing_status') or 'test interpretation'}); does not alter statutory claim verdict."
+
+                # Rule B: Material lab disagreements -> withhold CONTRADICTED, set NO EVIDENCE with reason 'labs disagree'
+                elif labs_disagree:
+                    c["audit_verdict"] = "NO EVIDENCE"
+                    disagree_summary = matching_report.get("disagreement_summary") or "labs disagree on measured values"
+                    c["reason"] = f"No evidence: labs disagree ({disagree_summary}). Both values displayed."
+
+                # Rule C: Non-accredited tests cannot produce CONTRADICTED
+                elif not is_accredited:
+                    c["audit_verdict"] = "NO EVIDENCE"
+                    if gap is not None:
+                        c["reason"] = f"Non-accredited test: {source_name} measured variance ({gap:+.1f}%), but non-accredited tests cannot set claim verdicts."
+                    else:
+                        c["reason"] = f"Non-accredited test: {source_name} finding noted for context only."
+
+                # Rule D: Accredited test evaluations
+                elif tier == "A" and matching_report.get("regulator_action") and any(w in c_text for w in ["health", "active", "strong"]):
                     if age_status == "recent" or allow_old:
                         c["audit_verdict"] = "CONTRADICTED"
                         c["reason"] = f"Contradicted by {source_name}: FSSAI directive confirmed no statutory category exists for 'Health Drink' in malted beverages."
@@ -756,7 +819,6 @@ class IndependentEvidenceService:
                         c["audit_verdict"] = "MISLEADING"
                         c["reason"] = f"Historical {source_name} finding; batch results apply to tested period."
 
-                # Case 2: Lab gap above tolerance
                 elif gap is not None and gap > self.tolerance_pct:
                     if age_status == "recent" or allow_old:
                         c["audit_verdict"] = "CONTRADICTED"
@@ -769,13 +831,11 @@ class IndependentEvidenceService:
                             f"but cannot produce CONTRADICTED on its own due to report age ({age_status}). {self.batch_note}"
                         )
 
-                # Case 3: Lab gap within tolerance (supports VERIFIED)
                 elif gap is not None and abs(gap) <= self.tolerance_pct:
                     if c.get("audit_verdict") in ["VERIFIED", "NO EVIDENCE"]:
                         c["audit_verdict"] = "VERIFIED"
                         c["reason"] = f"Verified by {source_name}: Tested parameter verified within {self.tolerance_pct}% statutory tolerance (gap: {gap:+.1f}%)."
 
-            # Strict guard: ensure verdict is strictly one of the 4 allowed verdicts
             if c.get("audit_verdict") not in ["VERIFIED", "MISLEADING", "CONTRADICTED", "NO EVIDENCE"]:
                 c["audit_verdict"] = "NO EVIDENCE"
 
@@ -784,12 +844,9 @@ class IndependentEvidenceService:
         return updated_claims
 
     # -------------------------------------------------------------------------
-    # 7. Extraction Pipeline: Reports to Structured Records
+    # 7. Extraction Pipeline
     # -------------------------------------------------------------------------
     def extract_and_validate_record(self, raw_input: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validates, normalizes, and structures an extracted report.
-        """
         record_id = raw_input.get("record_id") or f"ext_{int(datetime.now(timezone.utc).timestamp())}"
         raw_text = raw_input.get("raw_text_snippet") or raw_input.get("text", "")
         confidence = float(raw_input.get("confidence", 0.9))
@@ -834,7 +891,6 @@ class IndependentEvidenceService:
             elif label_val == 0 and lab_val == 0:
                 lab_gap = 0.0
 
-        # Date validation with natural language support
         test_date = raw_input.get("test_date") or extract_report_date(raw_text)
         pub_date = raw_input.get("publication_date") or extract_report_date(raw_text)
         age_years, age_status, age_display = self.compute_report_age(test_date, pub_date)

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import os
@@ -15,17 +16,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
 
 DEFAULT_ALLOWED_DOMAINS = [
-    "consumer-voice.org",
-    "join.consumer-voice.org",
-    "consumeraffairs.nic.in",
+    "www.trustified.in",
+    "trustified.in",
+    "www.unboxhealth.in",
+    "unboxhealth.in",
+    "unboxhealth-production.s3.amazonaws.com",
     "www.fssai.gov.in",
     "fssai.gov.in",
-    "mail.fssai.gov.in",
-    "nabl-india.org",
-    "www.nin.res.in",
-    "nin.res.in",
-    "amul.com",
-    "yogabars.in",
 ]
 
 BROWSER_USER_AGENT = (
@@ -39,6 +36,26 @@ MONTH_MAP = {
     "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
     "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12
 }
+
+ALLOWED_EVIDENCE_HOSTS = {
+    "www.trustified.in",
+    "trustified.in",
+    "www.unboxhealth.in",
+    "unboxhealth.in",
+    "unboxhealth-production.s3.amazonaws.com",
+}
+
+DISALLOWED_EVIDENCE_HOSTS = {
+    "shop.trustified.in",
+}
+
+DISALLOWED_PATH_KEYWORDS = [
+    "/explore/brand-list",
+    "/explore/products-list",
+    "/compare",
+    "/search",
+    "/collection",
+]
 
 
 def load_allowed_domains() -> List[str]:
@@ -135,6 +152,82 @@ def normalize_and_sanitize_url(
     return cleaned, None
 
 
+def validate_evidence_url(url: str) -> Tuple[bool, Optional[str]]:
+    """
+    Strictly validates a URL for the independent lab evidence feature.
+    Permitted hosts & path patterns:
+      1. www.trustified.in / trustified.in:
+         - /passandfail/<slug>
+         - /nmr-reports/<slug>
+         where <slug> is at least 1 non-slash char.
+      2. www.unboxhealth.in / unboxhealth.in:
+         - /explore/product/<slug>/<uuid>
+         where <uuid> is a 36-char lowercase/hex UUID with hyphens.
+      3. unboxhealth-production.s3.amazonaws.com:
+         - /unbox/media/Public_Documents/<name>.pdf
+    Rejects:
+      - Disallowed host (e.g. shop.trustified.in)
+      - Homepage, index (/passandfail, /nmr-reports, /explore), brand page, category page,
+        collection, compare page, search page.
+    """
+    if not url or not isinstance(url, str):
+        return False, "Empty or missing URL"
+
+    clean_url = url.strip().strip("'\"<>[](){}")
+    clean_url = re.sub(r'[\.,;:]+$', '', clean_url)
+
+    if not clean_url.startswith("http://") and not clean_url.startswith("https://"):
+        clean_url = f"https://{clean_url}"
+
+    try:
+        parsed = urlparse(clean_url)
+    except Exception as exc:
+        return False, f"Invalid URL format: {exc}"
+
+    host = parsed.netloc.lower().split(":")[0]
+    path = parsed.path.rstrip('/')
+
+    # Check disallowed hosts
+    if host in DISALLOWED_EVIDENCE_HOSTS:
+        return False, "disallowed host"
+
+    # Check allowed evidence hosts
+    if host not in ALLOWED_EVIDENCE_HOSTS:
+        return False, f"Host '{host}' is not an allowed lab evidence host"
+
+    # Check disallowed path keywords
+    for kw in DISALLOWED_PATH_KEYWORDS:
+        if kw in parsed.path.lower():
+            return False, f"Disallowed path keyword in URL: '{kw}'"
+
+    # 1. Trustified path checks
+    if host in ("www.trustified.in", "trustified.in"):
+        if not path or path in ("/passandfail", "/nmr-reports"):
+            return False, "Homepage or index URL is not an evidence link"
+        if re.match(r"^/passandfail/[a-zA-Z0-9_-]+$", path) or re.match(r"^/nmr-reports/[a-zA-Z0-9_-]+$", path):
+            return True, None
+        return False, "Invalid Trustified path structure: must be /passandfail/<slug> or /nmr-reports/<slug>"
+
+    # 2. Unbox Health product checks
+    if host in ("www.unboxhealth.in", "unboxhealth.in"):
+        if not path or path == "/explore" or path == "/explore/product":
+            return False, "Homepage or index URL is not an evidence link"
+        if "/brand" in path or "/category" in path:
+            return False, "Brand or category page is not an evidence link"
+        m_unbox = re.match(r"^/explore/product/[a-zA-Z0-9_-]+/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$", path)
+        if m_unbox:
+            return True, None
+        return False, "Invalid Unbox product path structure: must be /explore/product/<slug>/<uuid>"
+
+    # 3. Unbox Health S3 PDF checks
+    if host == "unboxhealth-production.s3.amazonaws.com":
+        if re.match(r"^/unbox/media/Public_Documents/[a-zA-Z0-9_.-]+\.pdf$", parsed.path):
+            return True, None
+        return False, "Invalid Unbox PDF path: must be /unbox/media/Public_Documents/<name>.pdf"
+
+    return False, "URL does not match any allowed evidence source patterns"
+
+
 def extract_report_date(text: str) -> Optional[str]:
     """
     Extracts publication or test date from text or HTML snippet.
@@ -184,6 +277,57 @@ def extract_report_date(text: str) -> Optional[str]:
     return None
 
 
+def verify_unbox_pdf_candidate(
+    product_page_html: str,
+    product_name: str = "",
+    client: Optional[httpx.Client] = None,
+    timeout_seconds: float = 10.0,
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    On an Unbox product page, finds the product image stem:
+      /unbox/media/product_variant/all_images/<stem>.webp
+    Candidate PDF URL:
+      https://unboxhealth-production.s3.amazonaws.com/unbox/media/Public_Documents/<stem>.pdf
+    Checks candidate URL via HEAD or GET.
+    If 200 and Content-Type is application/pdf and starts with %PDF (and contains lab info):
+      returns (candidate_url, None)
+    If 403, 404, HTML, or invalid:
+      returns (None, "Report PDF may require an Unbox Health login")
+    """
+    if not product_page_html or not isinstance(product_page_html, str):
+        return None, "Report PDF may require an Unbox Health login"
+
+    m_stem = re.search(r'/unbox/media/product_variant/all_images/([a-zA-Z0-9_.-]+)\.webp', product_page_html)
+    if not m_stem:
+        return None, "Report PDF may require an Unbox Health login"
+
+    stem = m_stem.group(1)
+    candidate_url = f"https://unboxhealth-production.s3.amazonaws.com/unbox/media/Public_Documents/{stem}.pdf"
+
+    headers = {
+        "User-Agent": BROWSER_USER_AGENT,
+        "Accept": "application/pdf,*/*",
+    }
+
+    try:
+        if client:
+            resp = client.get(candidate_url, headers=headers, follow_redirects=True, timeout=timeout_seconds)
+        else:
+            with httpx.Client(follow_redirects=True, timeout=timeout_seconds, max_redirects=5) as c:
+                resp = c.get(candidate_url, headers=headers)
+
+        if resp.status_code == 200:
+            content_type = resp.headers.get("Content-Type", "").lower()
+            content_bytes = resp.content if hasattr(resp, "content") else (resp.text.encode("utf-8") if hasattr(resp, "text") else b"")
+            if "application/pdf" in content_type or content_bytes.startswith(b"%PDF"):
+                if not (content_bytes.startswith(b"<!doctype") or content_bytes.startswith(b"<html") or b"<html>" in content_bytes[:200].lower()):
+                    return candidate_url, None
+    except Exception as exc:
+        logger.debug(f"Unbox PDF candidate verification failed for {candidate_url}: {exc}")
+
+    return None, "Report PDF may require an Unbox Health login"
+
+
 class DiagnosticsRegistry:
     """Internal diagnostic tracker for link retrieval, verification, and failures."""
     _instance = None
@@ -229,7 +373,7 @@ class DiagnosticsRegistry:
     def get_diagnostics(self) -> Dict[str, Any]:
         return {
             "source_metrics": self.source_metrics,
-            "failed_links": self.failed_links[-100:],  # last 100 failed links
+            "failed_links": self.failed_links[-100:],
             "total_failed_count": len(self.failed_links),
         }
 
@@ -237,11 +381,7 @@ class DiagnosticsRegistry:
 class LinkVerifier:
     """
     Server-side Link Verifier with 7-day caching, redirect following,
-    soft-404 detection, and strict status categorisation:
-    - reachable: HTTP 200-299 AND content matches brand/product or report title / PDF.
-    - dead: 404, 410, DNS failure, connection refused, soft 404.
-    - restricted: 401, 403, 429, login redirect, or subscription gate (join.consumer-voice.org).
-    - error: timeout or 5xx; retried once before failing.
+    soft-404 detection, and strict status categorisation.
     """
 
     def __init__(self, cache_ttl_days: int = 7, timeout_seconds: float = 10.0):
@@ -259,6 +399,7 @@ class LinkVerifier:
         source_id: Optional[int] = None,
         source_name: str = "Independent Lab Source",
         client: Optional[httpx.Client] = None,
+        strict_evidence_rules: bool = False,
     ) -> Dict[str, Any]:
         """
         Verifies a URL, checking cache first (7-day TTL).
@@ -279,6 +420,39 @@ class LinkVerifier:
             self.diagnostics.log_link_outcome(source_name, source_id, url, "dead", sanitization_error)
             return result
 
+        parsed = urlparse(normalized_url)
+        host = parsed.netloc.lower().split(":")[0]
+
+        # Disallowed host check
+        if host in DISALLOWED_EVIDENCE_HOSTS:
+            result = {
+                "link_status": "dead",
+                "http_status": None,
+                "final_url": normalized_url,
+                "checked_at": now.isoformat(),
+                "error_reason": "disallowed host",
+                "archived_url": None,
+                "is_restricted": False,
+            }
+            self.diagnostics.log_link_outcome(source_name, source_id, normalized_url, "dead", "disallowed host")
+            return result
+
+        # Strict evidence rules check if requested or if host is an evidence host
+        if strict_evidence_rules or host in ALLOWED_EVIDENCE_HOSTS:
+            is_valid_pattern, pattern_reason = validate_evidence_url(normalized_url)
+            if not is_valid_pattern:
+                result = {
+                    "link_status": "dead",
+                    "http_status": None,
+                    "final_url": normalized_url,
+                    "checked_at": now.isoformat(),
+                    "error_reason": pattern_reason,
+                    "archived_url": None,
+                    "is_restricted": False,
+                }
+                self.diagnostics.log_link_outcome(source_name, source_id, normalized_url, "dead", pattern_reason)
+                return result
+
         cache_key = normalized_url
         cached = self.cache.get(cache_key)
         if cached:
@@ -287,8 +461,6 @@ class LinkVerifier:
                 return cached
 
         # Check subscription-gated domains before network
-        parsed = urlparse(normalized_url)
-        host = parsed.netloc.lower().split(":")[0]
         if host == "join.consumer-voice.org":
             result = {
                 "link_status": "restricted",
@@ -310,6 +482,7 @@ class LinkVerifier:
             brand=brand,
             report_title=report_title,
             client=client,
+            strict_evidence_rules=strict_evidence_rules or (host in ALLOWED_EVIDENCE_HOSTS),
         )
         self.cache[cache_key] = result
         self.diagnostics.log_link_outcome(
@@ -324,16 +497,17 @@ class LinkVerifier:
         brand: str,
         report_title: str,
         client: Optional[httpx.Client] = None,
+        strict_evidence_rules: bool = False,
     ) -> Dict[str, Any]:
         headers = {
             "User-Agent": BROWSER_USER_AGENT,
             "Accept": "text/html,application/xhtml+xml,application/pdf,*/*",
         }
         now_str = datetime.now(timezone.utc).isoformat()
+        last_verified_str = now_str[:10]
 
         def _do_request():
             if client:
-                # Follow redirects up to 5
                 try:
                     resp = client.head(url, headers=headers, follow_redirects=True, timeout=self.timeout_seconds)
                     if resp.status_code in (405, 403, 400):
@@ -351,13 +525,12 @@ class LinkVerifier:
                         resp = c.get(url, headers=headers)
                     return resp
 
-        # Attempt 1
+        # Attempt with retry
         resp = None
         last_exc = None
         for attempt in range(2):
             try:
                 resp = _do_request()
-                # If 5xx, retry once
                 if resp.status_code >= 500 and attempt == 0:
                     time.sleep(0.5)
                     continue
@@ -368,7 +541,6 @@ class LinkVerifier:
                     time.sleep(0.5)
                     continue
             except (httpx.ConnectError, httpx.NetworkError) as e:
-                # DNS failure or connection refused -> dead
                 return {
                     "link_status": "dead",
                     "http_status": None,
@@ -408,6 +580,34 @@ class LinkVerifier:
                 "is_restricted": False,
             }
 
+        # Redirect depth / Shallower path check:
+        req_segments = [s for s in urlparse(url).path.strip('/').split('/') if s]
+        final_segments = [s for s in urlparse(final_url).path.strip('/').split('/') if s]
+        if req_segments and (not final_segments or len(final_segments) < len(req_segments)):
+            return {
+                "link_status": "dead",
+                "http_status": status_code,
+                "final_url": final_url,
+                "checked_at": now_str,
+                "error_reason": "Redirected to generic homepage root or shallower path (soft 404)",
+                "archived_url": f"https://web.archive.org/web/{final_url}",
+                "is_restricted": False,
+            }
+
+        # Check final URL against strict pattern if strict rules apply
+        if strict_evidence_rules:
+            is_valid_final, reason_final = validate_evidence_url(final_url)
+            if not is_valid_final:
+                return {
+                    "link_status": "dead",
+                    "http_status": status_code,
+                    "final_url": final_url,
+                    "checked_at": now_str,
+                    "error_reason": f"Redirected to disallowed path pattern: {reason_final}",
+                    "archived_url": f"https://web.archive.org/web/{final_url}",
+                    "is_restricted": False,
+                }
+
         # 401, 403, 429, or login redirect -> restricted
         if status_code in (401, 403, 429) or "login" in final_url.lower() or "signin" in final_url.lower():
             return {
@@ -415,7 +615,7 @@ class LinkVerifier:
                 "http_status": status_code,
                 "final_url": final_url,
                 "checked_at": now_str,
-                "error_reason": "Detailed results may require a subscription",
+                "error_reason": "Detailed results may require a subscription or login",
                 "archived_url": f"https://web.archive.org/web/{final_url}",
                 "is_restricted": True,
             }
@@ -437,10 +637,36 @@ class LinkVerifier:
         is_pdf = "application/pdf" in content_type or final_url.lower().endswith(".pdf")
 
         body_text = ""
+        raw_bytes = resp.content if hasattr(resp, "content") else (resp.text.encode("utf-8") if hasattr(resp, "text") else b"")
         try:
             body_text = resp.text.lower()
         except Exception:
             body_text = ""
+
+        # S3 PDF checks: ensure it is genuinely a PDF, not an HTML error
+        parsed_final = urlparse(final_url)
+        final_host = parsed_final.netloc.lower().split(":")[0]
+        if final_host == "unboxhealth-production.s3.amazonaws.com":
+            if not ("application/pdf" in content_type or raw_bytes.startswith(b"%PDF")):
+                return {
+                    "link_status": "dead",
+                    "http_status": status_code,
+                    "final_url": final_url,
+                    "checked_at": now_str,
+                    "error_reason": "Candidate PDF returned HTML/non-PDF response",
+                    "archived_url": None,
+                    "is_restricted": False,
+                }
+            if raw_bytes.startswith(b"<!doctype") or raw_bytes.startswith(b"<html") or b"<html>" in raw_bytes[:200].lower():
+                return {
+                    "link_status": "dead",
+                    "http_status": status_code,
+                    "final_url": final_url,
+                    "checked_at": now_str,
+                    "error_reason": "Candidate PDF returned HTML error page",
+                    "archived_url": None,
+                    "is_restricted": False,
+                }
 
         # Soft 404 check
         soft_404_markers = [
@@ -458,27 +684,52 @@ class LinkVerifier:
                 "is_restricted": False,
             }
 
-        # Check homepage redirect: if requested URL had a specific path, but redirected to root '/'
-        req_path = urlparse(url).path.strip('/')
-        final_path = urlparse(final_url).path.strip('/')
-        if req_path and not final_path:
-            return {
-                "link_status": "dead",
-                "http_status": status_code,
-                "final_url": final_url,
-                "checked_at": now_str,
-                "error_reason": "Redirected to generic homepage root (soft 404)",
-                "archived_url": f"https://web.archive.org/web/{final_url}",
-                "is_restricted": False,
-            }
+        # Unbox Health canonical UUID check
+        if final_host in ("www.unboxhealth.in", "unboxhealth.in"):
+            m_req_uuid = re.search(r'([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', url)
+            if m_req_uuid:
+                req_uuid = m_req_uuid.group(1).lower()
+                m_canon = re.search(r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)["\']', body_text, re.IGNORECASE)
+                if not m_canon:
+                    m_canon = re.search(r'<meta[^>]+property=["\']og:url["\'][^>]+content=["\']([^"\']+)["\']', body_text, re.IGNORECASE)
+                if m_canon:
+                    canon_href = m_canon.group(1)
+                    m_canon_uuid = re.search(r'([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', canon_href)
+                    if m_canon_uuid and m_canon_uuid.group(1).lower() != req_uuid:
+                        return {
+                            "link_status": "dead",
+                            "http_status": status_code,
+                            "final_url": final_url,
+                            "checked_at": now_str,
+                            "error_reason": f"Canonical UUID mismatch: requested {req_uuid} != canonical {m_canon_uuid.group(1).lower()}",
+                            "archived_url": f"https://web.archive.org/web/{final_url}",
+                            "is_restricted": False,
+                        }
 
-        # Check content match if HTML
+        # Trustified content check: must contain "Product Name" or target brand/product
+        if final_host in ("www.trustified.in", "trustified.in"):
+            if "product name" not in body_text:
+                tokens_to_check = []
+                if brand:
+                    tokens_to_check.extend([t for t in re.findall(r'\b\w{3,}\b', brand.lower()) if t not in ("the", "ltd", "and")])
+                if product_name:
+                    tokens_to_check.extend([t for t in re.findall(r'\b\w{4,}\b', product_name.lower()) if t not in ("pack", "with", "food")])
+                if tokens_to_check and not any(t in body_text for t in tokens_to_check):
+                    return {
+                        "link_status": "dead",
+                        "http_status": status_code,
+                        "final_url": final_url,
+                        "checked_at": now_str,
+                        "error_reason": "Content mismatch: Target brand or product not mentioned on Trustified page",
+                        "archived_url": f"https://web.archive.org/web/{final_url}",
+                        "is_restricted": False,
+                    }
+
+        # Content matching for generic pages
         match_found = False
         if is_pdf:
-            # PDF responses are verified
             match_found = True
         else:
-            # Check brand, product or report title keywords
             tokens_to_check = []
             if brand:
                 tokens_to_check.extend([t for t in re.findall(r'\b\w{3,}\b', brand.lower()) if t not in ("the", "ltd", "and")])
@@ -503,11 +754,32 @@ class LinkVerifier:
                 "is_restricted": False,
             }
 
+        # Proof snapshot creation
+        content_hash = hashlib.sha256(raw_bytes).hexdigest()
+        title_extracted = ""
+        m_title = re.search(r'<title[^>]*>(.*?)</title>', body_text, re.IGNORECASE | re.DOTALL)
+        if m_title:
+            title_extracted = m_title.group(1).strip()
+        elif is_pdf:
+            title_extracted = final_url.split('/')[-1]
+
+        snippet = body_text[:200] if body_text else ""
+
+        proof_snapshot = {
+            "final_url": final_url,
+            "title": title_extracted,
+            "snippet": snippet,
+            "content_hash": content_hash,
+            "checked_at": now_str,
+        }
+
         return {
             "link_status": "reachable",
             "http_status": status_code,
             "final_url": final_url,
             "checked_at": now_str,
+            "last_verified": last_verified_str,
+            "proof_snapshot": proof_snapshot,
             "error_reason": None,
             "archived_url": None,
             "is_restricted": False,
@@ -516,4 +788,3 @@ class LinkVerifier:
 
 # Global singleton instance
 link_verifier = LinkVerifier()
-
