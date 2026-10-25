@@ -87,12 +87,13 @@ class LabelTruthClaimsAuditor:
         raw_claims = agent_data.get("front_pack_claims", [])
         audited_claims = self._audit_claims(raw_claims, nutrition, contains_palm_oil, ingredients_list, product_url)
 
-        # 5. Independent Evidence Service (Section 1: Lab/Regulatory & Section 2: Social Unverified)
+        # 5. Independent Evidence Service (Independent Lab & Regulatory Evidence)
         evidence_service = IndependentEvidenceService()
         independent_evidence = evidence_service.get_evidence_for_product(
             query=query,
             product_name=product_name,
             brand=brand,
+            category=category,
             claims=audited_claims,
         )
 

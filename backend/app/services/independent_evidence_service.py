@@ -18,10 +18,9 @@ class IndependentEvidenceService:
     """
     Independent Evidence Service for LabelTruth.
     Manages:
-    1. Section 1: Independent Lab & Regulatory Evidence (Tier A/B/C/D, 7 acceptance rules, report-age flags).
-    2. Section 2: Social Media & Community Opinions (Unverified commentary, neutral wording, zero rating influence).
-    3. Claim Verdict Integration (Section 1 only; Personalised Rating & allergy checks are strictly untouched).
-    4. Structured extraction normalization pipeline.
+    1. Independent Lab & Regulatory Evidence (Tier A/B/C/D, 7 acceptance rules, report-age flags).
+    2. Claim Verdict Integration (Section 1 only; Personalised Rating & allergy checks are strictly untouched).
+    3. Structured extraction normalization pipeline.
     """
 
     def __init__(
@@ -39,10 +38,6 @@ class IndependentEvidenceService:
         self.lab_seeds = self._load_json_list([
             self.data_dir / "lab_reports_seed.json",
             self.config_dir / "lab_reports_seed.json",
-        ])
-        self.social_seeds = self._load_json_list([
-            self.data_dir / "social_seed.json",
-            self.config_dir / "social_seed.json",
         ])
 
         # Config switches
@@ -246,12 +241,13 @@ class IndependentEvidenceService:
         query: str,
         product_name: str,
         brand: str,
+        category: str = "",
         claims: Optional[List[Dict[str, Any]]] = None,
         search_results: Optional[List[Dict[str, Any]]] = None,
         ref_date: Optional[date] = None,
     ) -> Dict[str, Any]:
         """
-        Retrieves Section 1 (accepted & reported_not_verified) and Section 2 items
+        Retrieves Independent Lab & Regulatory Evidence records (accepted & reported_not_verified)
         matching the viewed product.
         Guarantees that Personalised Rating and allergy check are completely untouched.
         """
@@ -354,130 +350,22 @@ class IndependentEvidenceService:
             else:
                 unverified_lab.append(item)
 
-        # 2. Process Section 2 Social Opinions
-        social_items: List[Dict[str, Any]] = []
-        for seed in self.social_seeds:
-            s_item = dict(seed)
-            if not is_match(s_item):
-                continue
-
-            # Ensure required Section 2 fields and neutral disclaimer
-            s_item["disclaimer"] = "Unverified opinion. Not used in verdicts, ratings or recommendations."
-            social_items.append(s_item)
-
-            # Check: If a creator post links a qualifying lab report, add that report to Section 1
-            if s_item.get("links_lab_report") and s_item.get("linked_lab_record_id"):
-                linked_id = s_item["linked_lab_record_id"]
-                matching_lab = next((x for x in self.lab_seeds if x.get("record_id") == linked_id), None)
-                if matching_lab:
-                    lab_copy = dict(matching_lab)
-                    lab_copy["discovery_source"] = f"Linked by creator {s_item.get('handle', s_item.get('creator_name', ''))}"
-                    age_y, age_st, age_disp = self.compute_report_age(
-                        test_date_str=lab_copy.get("test_date"),
-                        publication_date_str=lab_copy.get("publication_date"),
-                        ref_date=ref_date,
-                    )
-                    lab_copy["age_years"] = age_y
-                    lab_copy["age_status"] = age_st
-                    lab_copy["age_display"] = age_disp
-                    lab_copy["batch_note"] = self.batch_note
-                    st, reas = self.evaluate_acceptance_rules(lab_copy, query, product_name, brand)
-                    lab_copy["status"] = st
-                    lab_copy["not_verified_reason"] = reas
-                    # If not already present in accepted or unverified list, add it
-                    existing_ids = [x.get("record_id") for x in accepted_lab + unverified_lab]
-                    if lab_copy.get("record_id") not in existing_ids:
-                        if st == "accepted":
-                            accepted_lab.append(lab_copy)
-                        else:
-                            unverified_lab.append(lab_copy)
-
-        # 3. Dynamic Fallback for Any Unseeded Product:
-        # If no accepted lab report exists for this product, synthesize a verified Tier A statutory benchmark
-        # using the live official FSSAI Gazette 2020 PDF (which is verified 200 OK) so it is NEVER empty.
-        if not accepted_lab:
-            prod_display = product_name or query.title()
-            brand_display = brand or "Packaged Food Brand"
-            safe_slug = re.sub(r'[^a-z0-9]', '_', q_clean)[:15]
-
-            statutory_report = {
-                "record_id": f"lab_fssai_statutory_{safe_slug}",
-                "section": "lab_regulatory",
-                "source_name": "FSSAI Statutory Labelling & Safety Benchmark",
-                "source_type": "statutory_regulator",
-                "tier": "A",
-                "discovery_url": "https://www.fssai.gov.in/cms/food-safety-and-standards-regulations.php",
-                "original_report_url": "https://www.fssai.gov.in/upload/notifications/2020/12/5fd87c6a0f6adGazette_Notification_Labelling_Display_14_12_2020.pdf",
-                "publication_date": "2024-01-15",
-                "test_date": "2024-01-15",
-                "lab_name": "FSSAI Notified Food Safety Testing Network",
-                "accreditation_no": "FSSAI-STATUTORY-2020",
-                "accreditation_checked": True,
-                "accreditation_source_url": "https://nabl-india.org",
-                "method": "FSS (Labelling and Display) Regulations 2020 Protocol",
-                "sample_count": "Statutory Baseline",
-                "batch": "Market Surveillance Baseline",
-                "brand": brand_display,
-                "product": prod_display,
-                "variant": "Standard Market Pack",
-                "pack_size": "Standard Pack",
-                "parameter": "Nutrient Declaration & Claim Standards",
-                "label_value": None,
-                "lab_value": None,
-                "unit": "statutory_compliance",
-                "basis": "per 100 g / per serving",
-                "lab_gap_pct": None,
-                "brand_response": f"{brand_display} packaged food products must declare nutrition facts, allergens, and oil sources in conformity with FSS Regulations.",
-                "regulator_action": "Statutory FSSAI notification governing marketing claims, front-of-pack thresholds, and declared tolerances.",
-                "age_years": 1.7,
-                "age_status": "recent",
-                "age_display": "Published: 2024-01-15 (1.7 yrs ago)",
-                "batch_note": self.batch_note,
-                "match": {"same_product": True, "same_metric": True},
-                "status": "accepted",
-                "not_verified_reason": None,
-                "confidence": 0.96,
-                "needs_review": False,
-                "raw_text_snippet": f"Official FSSAI statutory gazette standards for packaged foods, setting mandatory limits for {prod_display}.",
-                "fetched_at": datetime.now(timezone.utc).isoformat(),
-                "disclaimer": self.standard_disclaimer,
-            }
-            accepted_lab.append(statutory_report)
-
-        # If social items empty, synthesize a public consumer watch discussion
-        if not social_items:
-            prod_display = product_name or query.title()
-            safe_slug = re.sub(r'[^a-z0-9]', '_', q_clean)[:15]
-            social_items.append({
-                "id": f"social_{safe_slug}_public_watch",
-                "section": "social",
-                "product_key": q_clean,
-                "brand": brand or "Packaged Food Brand",
-                "product": prod_display,
-                "platform": "X (Twitter) / Consumer Forums",
-                "platform_icon": "twitter",
-                "handle": "@fssaiindia",
-                "creator_name": "Consumer Food Safety Watch",
-                "post_date": "2024-08-15",
-                "url": "https://twitter.com/fssaiindia",
-                "summary": f"Public discussions and consumer feedback concerning ingredient transparency and label disclosures for {prod_display}.",
-                "links_lab_report": False,
-                "linked_lab_record_id": None,
-                "disclaimer": "Unverified opinion. Not used in verdicts, ratings or recommendations.",
-            })
+        cat_disp = category or ""
+        browse_text = (
+            f"Browse Consumer Voice {cat_disp} reviews (not evidence for this product)"
+            if cat_disp
+            else "Browse Consumer Voice reviews (not evidence for this product)"
+        )
 
         return {
             "section_1": {
                 "heading": "Independent lab & regulatory evidence",
                 "accepted": accepted_lab,
                 "reported_not_verified": unverified_lab,
-                "empty_state_text": "No matching lab report found",
-            },
-            "section_2": {
-                "heading": "Social media & community opinions (unverified)",
-                "items": social_items,
-                "empty_state_text": "No public opinions collected",
-            },
+                "empty_state_text": "No matching lab report found for this product.",
+                "category_browse_url": "https://consumer-voice.org/category/food/",
+                "category_browse_text": browse_text,
+            }
         }
 
     # -------------------------------------------------------------------------
@@ -605,6 +493,17 @@ class IndependentEvidenceService:
         raw_text = raw_input.get("raw_text_snippet") or raw_input.get("text", "")
         confidence = float(raw_input.get("confidence", 0.9))
         needs_review = bool(raw_input.get("needs_review", False))
+
+        section = raw_input.get("section")
+        if section == "social":
+            raise ValueError(
+                "Invalid evidence section: 'social'. Social content is not supported; "
+                "evidence records must strictly belong to 'lab_regulatory'."
+            )
+        if section and section != "lab_regulatory":
+            raise ValueError(
+                f"Invalid evidence section: '{section}'. Evidence records must strictly belong to 'lab_regulatory'."
+            )
 
         # 1. Parse numeric values safely (null if missing or unparseable, NEVER 0)
         def parse_num(val: Any) -> Optional[float]:

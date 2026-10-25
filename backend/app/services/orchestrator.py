@@ -96,7 +96,7 @@ class AuditOrchestrator:
                         product_data.get("ingredients", [])
                     )
 
-                # Independent Evidence evaluation (Section 1: Lab/Regulatory & Section 2: Social Opinions)
+                # Independent Evidence evaluation (Independent Lab & Regulatory Evidence)
                 evidence_service = IndependentEvidenceService()
                 p_name_val = product_data.get("product_name", {}).get("value", cleaned_query)
                 p_brand_val = product_data.get("brand", {}).get("value", "")

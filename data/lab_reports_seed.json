@@ -125,7 +125,7 @@
     "not_verified_reason": "Original laboratory report not accessible (Rule 3); secondary news article citation only without primary analytical data sheet or accredited laboratory certificate.",
     "confidence": 0.35,
     "needs_review": true,
-    "raw_text_snippet": "Online news commentary citing secondary social assertions regarding sugar percentage without attaching the official NABL laboratory certificate.",
+    "raw_text_snippet": "Online news commentary citing secondary unverified claims regarding sugar percentage without attaching the official NABL laboratory certificate.",
     "fetched_at": "2026-10-24T18:00:00Z"
   },
   {
@@ -340,7 +340,7 @@
     "not_verified_reason": "Original laboratory report not accessible (Rule 3); blog post pointer only without testing methodology, sample size, or NABL certification.",
     "confidence": 0.3,
     "needs_review": true,
-    "raw_text_snippet": "Blog article quoting social media assertions regarding potato chips trans fat without attaching an accredited testing certificate.",
+    "raw_text_snippet": "Blog article quoting unverified claims regarding potato chips trans fat without attaching an accredited testing certificate.",
     "fetched_at": "2026-10-24T18:00:00Z"
   },
   {

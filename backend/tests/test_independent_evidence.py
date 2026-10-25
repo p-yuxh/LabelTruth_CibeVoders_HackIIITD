@@ -238,50 +238,63 @@ def test_milk_report_not_on_butter_and_microbiological_not_on_sugar(evidence_ser
     assert "coliform" not in updated_claims[0].get("reason", "").lower()
 
 
-def test_creator_post_without_lab_report_only_in_section_2(evidence_service):
+def test_absence_of_social_section_and_seed_config(evidence_service):
     """
-    A creator post without a lab report appears only in Section 2 and has zero effect on verdicts.
+    Evidence result contains only Section 1 (Independent Lab & Regulatory Evidence).
+    Section 2, social seeds, and creator opinions are completely absent.
     """
+    from pathlib import Path
+
+    # Verify social seed files are deleted
+    assert not Path("data/social_seed.json").exists()
+    assert not Path("backend/app/config_data/social_seed.json").exists()
+
     res = evidence_service.get_evidence_for_product(
         query="Nestle Maggi 2-Minute Noodles",
         product_name="Nestle Maggi 2-Minute Noodles",
         brand="Nestle India",
     )
-    section_1_ids = [x["record_id"] for x in res["section_1"]["accepted"]]
-    section_2_handles = [x.get("handle") for x in res["section_2"]["items"]]
-
-    # Nutritionist creator Pooja Malhotra is in Section 2
-    assert "@nutrition_by_pooja" in section_2_handles
-    # Does NOT appear in Section 1 accepted
-    assert "social_maggi_instagram_001" not in section_1_ids
-
-    # Section 2 items must carry mandatory unverified disclaimer
-    for item in res["section_2"]["items"]:
-        assert "Unverified opinion" in item["disclaimer"]
+    # Section 2 must NOT exist in the evidence payload
+    assert "section_2" not in res
+    assert "social" not in str(res).lower()
+    assert "section_1" in res
+    assert res["section_1"]["heading"] == "Independent lab & regulatory evidence"
 
 
-def test_creator_post_linking_qualifying_lab_report_adds_section_1(evidence_service):
+def test_evidence_record_schema_rejects_social_section(evidence_service):
     """
-    A creator post linking a qualifying lab report adds a Section 1 record
-    (with creator as discovery source) and keeps the post itself in Section 2.
+    Evidence record schema has no 'social' section; loading any record with section 'social' is rejected.
+    """
+    with pytest.raises(ValueError, match="Invalid evidence section: 'social'"):
+        evidence_service.extract_and_validate_record({
+            "section": "social",
+            "source_name": "Unverified Platform Post",
+            "label_value": 10.0,
+        })
+
+    # Valid lab record must have section 'lab_regulatory'
+    valid_rec = evidence_service.extract_and_validate_record({
+        "section": "lab_regulatory",
+        "source_name": "NABL Accredited Testing Facility",
+        "label_value": 10.0,
+    })
+    assert valid_rec["section"] == "lab_regulatory"
+
+
+def test_product_with_no_lab_report_renders_empty_state(evidence_service):
+    """
+    A product with no matching lab report returns an empty accepted list and proper empty state text.
     """
     res = evidence_service.get_evidence_for_product(
-        query="Cadbury Bournvita",
-        product_name="Cadbury Bournvita",
-        brand="Cadbury / Mondelez",
+        query="Unknown Generic Brand Unseeded Biscuit 999",
+        product_name="Unknown Generic Brand Unseeded Biscuit 999",
+        brand="Generic Foods",
+        category="Biscuits",
     )
-    # Creator Revant Himatsingka (@foodpharmer) is in Section 2
-    section_2_creators = [x.get("handle") for x in res["section_2"]["items"]]
-    assert "@foodpharmer" in section_2_creators
-
-    # The linked lab report (lab_bournvita_sugar_002) is present in Section 1 accepted
-    accepted_ids = [x["record_id"] for x in res["section_1"]["accepted"]]
-    assert "lab_bournvita_sugar_002" in accepted_ids
-
-    # Find the accepted report
-    sugar_rep = next(x for x in res["section_1"]["accepted"] if x["record_id"] == "lab_bournvita_sugar_002")
-    assert sugar_rep["status"] == "accepted"
-    assert sugar_rep["original_report_url"] != ""
+    assert res["section_1"]["accepted"] == []
+    assert res["section_1"]["empty_state_text"] == "No matching lab report found for this product."
+    assert "consumer-voice.org" in res["section_1"]["category_browse_url"]
+    assert "Biscuits" in res["section_1"]["category_browse_text"]
 
 
 def test_trustified_item_without_original_report_goes_to_unverified(evidence_service):
@@ -350,7 +363,7 @@ def test_personalized_rating_and_allergy_results_identical_with_and_without_evid
     }
 
     product_with_evidence = copy.deepcopy(product_without_evidence)
-    # Attach rich Section 1 and Section 2 independent evidence records
+    # Attach rich Section 1 independent lab evidence records
     product_with_evidence["independent_evidence"] = {
         "section_1": {
             "accepted": [
@@ -359,9 +372,6 @@ def test_personalized_rating_and_allergy_results_identical_with_and_without_evid
             "reported_not_verified": [
                 {"record_id": "rec_02", "not_verified_reason": "Low confidence"}
             ]
-        },
-        "section_2": {
-            "items": [{"creator_name": "FoodPharmer", "summary": "Unverified comment"}]
         }
     }
     # Also test with contradicted claim

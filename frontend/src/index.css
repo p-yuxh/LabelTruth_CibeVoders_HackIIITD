@@ -1348,7 +1348,7 @@ body {
 }
 
 /* ==========================================================================
-   INDEPENDENT EVIDENCE SYSTEM (Section 1: Lab & Section 2: Social)
+   INDEPENDENT EVIDENCE SYSTEM (Section 1: Lab & Regulatory Evidence)
    Strictly Monochrome / Neutral, Square Corners, WCAG AA Compliant
    ========================================================================== */
 
@@ -1628,69 +1628,6 @@ body {
   padding: 6px 10px;
 }
 
-/* Section 2: Social Media & Community Opinions (Unverified) */
-.social-item-card {
-  background: #080808;
-  border: 1px solid #222222;
-  padding: 16px;
-  margin-bottom: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.social-item-card:last-child {
-  margin-bottom: 0;
-}
-
-.social-meta-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.social-platform-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #ffffff;
-}
-
-.social-unverified-tag {
-  background: #171717;
-  border: 1px solid #333333;
-  color: #a3a3a3;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 2px 7px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.social-summary-text {
-  font-size: 0.85rem;
-  color: #cccccc;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.social-disclaimer-label {
-  font-size: 0.72rem;
-  color: #737373;
-  border-top: 1px solid #1a1a1a;
-  padding-top: 6px;
-  margin-top: 2px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-weight: 600;
-}
 
 .empty-evidence-box {
   text-align: center;

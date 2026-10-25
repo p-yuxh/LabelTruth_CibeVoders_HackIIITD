@@ -308,12 +308,12 @@ async def get_reference_standards(share_of_daily: float = 0.15):
 @router.get(
     "/independent-evidence",
     summary="Independent Lab & Regulatory Evidence Registry",
-    description="Returns Section 1 (lab/regulatory reports with tiers & age badges) and Section 2 (unverified community opinions) for a product query."
+    description="Returns independent lab & regulatory reports with tiers, age badges, and acceptance verification for a product query."
 )
-async def get_independent_evidence(query: str = "", product_name: str = "", brand: str = ""):
+async def get_independent_evidence(query: str = "", product_name: str = "", brand: str = "", category: str = ""):
     from app.services.independent_evidence_service import IndependentEvidenceService
     svc = IndependentEvidenceService()
-    return svc.get_evidence_for_product(query=query, product_name=product_name, brand=brand)
+    return svc.get_evidence_for_product(query=query, product_name=product_name, brand=brand, category=category)
 
 
 @router.get("/health", summary="Health Check")

@@ -139,12 +139,13 @@ export async function fetchEvidenceLogs(limit = 30, offset = 0) {
   }
 }
 
-export async function apiGetIndependentEvidence(query = '', productName = '', brand = '') {
+export async function apiGetIndependentEvidence(query = '', productName = '', brand = '', category = '') {
   try {
     const params = new URLSearchParams();
     if (query) params.append('query', query);
     if (productName) params.append('product_name', productName);
     if (brand) params.append('brand', brand);
+    if (category) params.append('category', category);
 
     const response = await fetch(`${API_BASE}/independent-evidence?${params.toString()}`);
     if (!response.ok) {

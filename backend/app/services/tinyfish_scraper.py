@@ -178,8 +178,7 @@ class TinyFishScraperService:
     def run_full_pipeline(self, query: str) -> Dict[str, Any]:
         """
         Orchestrates Search -> Fetch -> Agent for the given product query.
-        Guarantees that non-retailer social media domains (Instagram, TikTok, etc.)
-        are filtered out to prevent broken scrapes.
+        Guarantees that excluded non-retailer domains are filtered out to prevent broken scrapes.
         """
         logger.info(f"Initiating TinyFish scraping for query: {query}")
         search_results = self.search_product(query)

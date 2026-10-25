@@ -330,9 +330,9 @@ export default function ProductCard({ data }) {
       </div>
 
       {/* =========================================
-          MIDDLE: Independent Evidence (Section 1: Lab & Section 2: Social)
+          MIDDLE: Independent Lab & Regulatory Evidence
          ========================================= */}
-      <IndependentEvidenceSection evidence={independent_evidence} />
+      <IndependentEvidenceSection evidence={independent_evidence} category={category} />
 
       {/* =========================================
           BOTTOM: Statutory Standards & Provenance Citations

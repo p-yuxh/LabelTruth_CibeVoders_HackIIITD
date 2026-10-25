@@ -46,6 +46,25 @@ def get_sessionmaker():
     return _sessionmaker
 
 
+from sqlalchemy import text, inspect
+
+def _sync_sqlite_schema(sync_conn):
+    """Ensure newly added columns in Base metadata exist in existing SQLite tables."""
+    try:
+        inspector = inspect(sync_conn)
+        for table_name, table in Base.metadata.tables.items():
+            if not inspector.has_table(table_name):
+                continue
+            existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+            for col in table.columns:
+                if col.name not in existing_cols:
+                    col_type = col.type.compile(sync_conn.dialect)
+                    sync_conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}"))
+                    logger.info(f"Auto-migrated SQLite table '{table_name}': added column '{col.name}' ({col_type})")
+    except Exception as e:
+        logger.warning(f"SQLite schema sync warning: {e}")
+
+
 async def init_db():
     """
     Test the database connection and create tables if they do not exist.
@@ -57,6 +76,8 @@ async def init_db():
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            if "sqlite" in str(engine.url):
+                await conn.run_sync(_sync_sqlite_schema)
         logger.info(f"Database initialized successfully with URL: {engine.url}")
     except Exception as exc:
         logger.warning(
@@ -77,39 +98,14 @@ async def init_db():
         )
         async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(_sync_sqlite_schema)
         logger.info(f"Fallback database initialized with: {_engine.url}")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for obtaining database sessions with automatic resilience."""
-    global _engine, _sessionmaker
     sm = get_sessionmaker()
-    try:
-        async with sm() as session:
-            try:
-                # Quick probe to ensure connection is live
-                yield session
-            except Exception as e:
-                # If connection refused (e.g. PostgreSQL down), switch to fallback immediately
-                err_msg = str(e)
-                if "connection refused" in err_msg.lower() or "connect call failed" in err_msg.lower():
-                    logger.warning(f"Active session connection failed ({e}). Switching engine to local SQLite fallback.")
-                    _engine = create_async_engine(
-                        settings.FALLBACK_DATABASE_URL,
-                        echo=False,
-                        future=True,
-                    )
-                    _sessionmaker = async_sessionmaker(
-                        bind=_engine,
-                        class_=AsyncSession,
-                        expire_on_commit=False,
-                    )
-                    async with _engine.begin() as conn:
-                        await conn.run_sync(Base.metadata.create_all)
-                    async with _sessionmaker() as fallback_session:
-                        yield fallback_session
-                else:
-                    raise
-    finally:
-        pass
+    async with sm() as session:
+        yield session
+
 

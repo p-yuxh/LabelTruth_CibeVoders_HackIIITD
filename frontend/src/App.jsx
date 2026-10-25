@@ -83,7 +83,8 @@ function MainApp() {
         const ev = await apiGetIndependentEvidence(
           log.query,
           pData.product_name?.value || log.product_name || log.query,
-          pData.brand?.value || log.brand || ''
+          pData.brand?.value || log.brand || '',
+          pData.category?.value || log.category || ''
         );
         if (ev) {
           pData.independent_evidence = ev;

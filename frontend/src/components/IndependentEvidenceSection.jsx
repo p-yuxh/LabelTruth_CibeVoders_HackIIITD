@@ -2,36 +2,36 @@ import React, { useState } from 'react';
 import {
   FileText,
   ExternalLink,
-  ShieldCheck,
   AlertCircle,
   Clock,
   ChevronDown,
   ChevronUp,
   Info,
-  MessageSquare,
   CheckCircle2,
   HelpCircle,
-  Share2,
 } from 'lucide-react';
 
-export default function IndependentEvidenceSection({ evidence }) {
+export default function IndependentEvidenceSection({ evidence, category }) {
   const [unverifiedOpen, setUnverifiedOpen] = useState(false);
 
   if (!evidence) {
     return null;
   }
 
-  const section1 = evidence.section_1 || {};
-  const section2 = evidence.section_2 || {};
-
+  const section1 = evidence.section_1 || evidence;
   const acceptedReports = section1.accepted || [];
   const unverifiedReports = section1.reported_not_verified || [];
-  const socialItems = section2.items || [];
+
+  const categoryName = category?.value || category || '';
+  const browseText =
+    section1.category_browse_text ||
+    `Browse Consumer Voice ${categoryName ? categoryName + ' ' : ''}reviews (not evidence for this product)`;
+  const browseUrl = section1.category_browse_url || 'https://consumer-voice.org/category/food/';
 
   return (
     <div className="evidence-container">
       {/* =================================================================
-          SECTION 1: INDEPENDENT LAB & REGULATORY EVIDENCE
+          INDEPENDENT LAB & REGULATORY EVIDENCE
           ================================================================= */}
       <section className="evidence-section-card" aria-label="Independent lab and regulatory evidence">
         <div className="evidence-section-header">
@@ -44,14 +44,30 @@ export default function IndependentEvidenceSection({ evidence }) {
           </span>
         </div>
 
-        {/* Accepted Section 1 Reports */}
+        {/* Accepted Reports */}
         {acceptedReports.length === 0 ? (
           <div className="empty-evidence-box">
-            <Info size={18} style={{ marginBottom: '6px', color: '#737373' }} />
-            <div>No matching lab report found</div>
-            <div style={{ fontSize: '0.74rem', color: '#555555', marginTop: '4px' }}>
+            <Info size={18} style={{ marginBottom: '8px', color: '#737373' }} />
+            <div style={{ fontSize: '0.9rem', color: '#e5e5e5', fontWeight: 700 }}>
+              No matching lab report found for this product.
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#888888', marginTop: '6px' }}>
               Claims without independent analytical testing default to statutory label cross-referencing.
             </div>
+            {browseUrl && (
+              <div style={{ marginTop: '12px' }}>
+                <a
+                  href={browseUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="citation-link"
+                  style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <ExternalLink size={12} />
+                  <span>{browseText}</span>
+                </a>
+              </div>
+            )}
           </div>
         ) : (
           acceptedReports.map((report) => {
@@ -264,68 +280,8 @@ export default function IndependentEvidenceSection({ evidence }) {
           </div>
         )}
       </section>
-
-      {/* =================================================================
-          SECTION 2: SOCIAL MEDIA & COMMUNITY OPINIONS (UNVERIFIED)
-          ================================================================= */}
-      <section className="evidence-section-card" aria-label="Social media and community opinions">
-        <div className="evidence-section-header">
-          <h3 className="evidence-heading">
-            <MessageSquare size={18} />
-            Social media &amp; community opinions (unverified)
-          </h3>
-          <span style={{ fontSize: '0.74rem', color: '#888888', fontWeight: 600 }}>
-            {socialItems.length} Public {socialItems.length === 1 ? 'Comment' : 'Comments'}
-          </span>
-        </div>
-
-        {socialItems.length === 0 ? (
-          <div className="empty-evidence-box">
-            <Share2 size={18} style={{ marginBottom: '6px', color: '#737373' }} />
-            <div>No public opinions collected</div>
-            <div style={{ fontSize: '0.74rem', color: '#555555', marginTop: '4px' }}>
-              No public commentary or creator reviews on record for this product.
-            </div>
-          </div>
-        ) : (
-          socialItems.map((social) => (
-            <article key={social.id} className="social-item-card">
-              <div className="social-meta-row">
-                <div className="social-platform-badge">
-                  <span>{social.platform}</span>
-                  <span style={{ color: '#737373' }}>•</span>
-                  <span style={{ color: '#ffffff' }}>{social.handle || social.creator_name}</span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#737373' }}>
-                    {social.post_date}
-                  </span>
-                  <span className="social-unverified-tag">Unverified</span>
-                  {social.url && (
-                    <a
-                      href={social.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="citation-link"
-                      style={{ fontSize: '0.76rem' }}
-                    >
-                      <ExternalLink size={11} /> View Post
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              <p className="social-summary-text">{social.summary}</p>
-
-              <div className="social-disclaimer-label">
-                {social.disclaimer || 'Unverified opinion. Not used in verdicts, ratings or recommendations.'}
-              </div>
-            </article>
-          ))
-        )}
-      </section>
     </div>
   );
 }
+
 
