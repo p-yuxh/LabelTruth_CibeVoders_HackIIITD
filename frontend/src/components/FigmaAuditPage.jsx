@@ -1,19 +1,93 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FigmaFormulaInfo from './FigmaFormulaInfo';
+import { calculatePersonalizedScore } from '../services/api';
+
+const AVAILABLE_CONDITIONS = [
+  { id: 'general_health', label: 'General Health', desc: 'Standard balanced limits (ICMR-NIN 2024)' },
+  { id: 'diabetes', label: 'Diabetes', desc: 'Strict added sugar and carb limits' },
+  { id: 'prediabetes', label: 'Prediabetes', desc: 'Strict free sugars restriction' },
+  { id: 'high_blood_pressure', label: 'High Blood Pressure', desc: 'Strict sodium (<200mg/serving) limit' },
+  { id: 'high_cholesterol', label: 'High Cholesterol', desc: 'Strict saturated fat (<2g/serving) and palm oil limits' },
+  { id: 'coeliac_disease', label: 'Coeliac Disease', desc: 'Medically required zero gluten avoidance' },
+  { id: 'lactose_intolerance', label: 'Lactose Intolerance', desc: 'Zero milk and dairy protein gate' },
+];
 
 export default function FigmaAuditPage({
   auditData,
+  rawProductData,
   onSearch,
   onBack,
   onOpenEvidenceLogs,
   onOpenAuth,
   onOpenAccount,
+  onOpenPersonalize,
+  onUpdateScoring,
   isLoggedIn,
   user,
+  profile,
   loading = false,
 }) {
   const [query, setQuery] = useState(auditData?.productName || auditData?.query || '');
   const [forceRefresh, setForceRefresh] = useState(false);
+
+  // Active conditions state
+  const [activeConditions, setActiveConditions] = useState(() => {
+    return (profile?.dietary_conditions && profile.dietary_conditions.length > 0)
+      ? profile.dietary_conditions
+      : ['general_health'];
+  });
+  const [recalculating, setRecalculating] = useState(false);
+
+  useEffect(() => {
+    if (profile?.dietary_conditions && profile.dietary_conditions.length > 0) {
+      setActiveConditions(profile.dietary_conditions);
+    }
+  }, [profile]);
+
+  const activeCount =
+    (profile?.dietary_conditions?.filter((c) => c !== 'general_health')?.length || 0) +
+    (profile?.allergies?.length || 0) +
+    (profile?.avoid_ingredients?.length || 0);
+
+  const handleToggleCondition = async (condId) => {
+    let next;
+    if (condId === 'general_health') {
+      next = ['general_health'];
+    } else {
+      const withoutGeneral = activeConditions.filter((c) => c !== 'general_health');
+      if (withoutGeneral.includes(condId)) {
+        next = withoutGeneral.filter((c) => c !== condId);
+        if (next.length === 0) next = ['general_health'];
+      } else {
+        next = [...withoutGeneral, condId];
+      }
+    }
+    setActiveConditions(next);
+
+    if (rawProductData && onUpdateScoring) {
+      setRecalculating(true);
+      try {
+        const activeAllergens = profile?.allergies || [];
+        const avoids = profile?.avoid_ingredients || [];
+        const pattern = profile?.dietary_pattern || 'none';
+        const goals = profile?.nutrition_goals || [];
+
+        const newScores = await calculatePersonalizedScore({
+          product_data: rawProductData,
+          conditions: next,
+          user_allergens: activeAllergens,
+          avoid_ingredients: avoids,
+          dietary_pattern: pattern,
+          nutrition_goals: goals,
+        });
+        onUpdateScoring(newScores);
+      } catch (err) {
+        console.error('Error updating personalized scoring:', err);
+      } finally {
+        setRecalculating(false);
+      }
+    }
+  };
 
   // Accordion toggle states
   const [claimsOpen, setClaimsOpen] = useState(true);
@@ -61,6 +135,15 @@ export default function FigmaAuditPage({
           </span>
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            className="personalize-nav-btn"
+            onClick={() => onOpenPersonalize && onOpenPersonalize('complete')}
+            title="Personalise your health conditions and dietary preferences"
+          >
+            Personalise
+            {activeCount > 0 && <span className="header-badge">{activeCount}</span>}
+          </button>
           <button
             className="audit-history"
             onClick={onOpenEvidenceLogs}
@@ -134,6 +217,65 @@ export default function FigmaAuditPage({
           </span>
           <b>{auditData.verifiedSourcesCount} verified sources</b>
         </div>
+
+        {/* Personalisation Profile Panel */}
+        <section className="profile-panel" style={{ marginTop: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <span>YOUR DIETARY CONDITIONS &amp; PREFERENCES <FigmaFormulaInfo ids={[4, 12]} /></span>
+            <button
+              type="button"
+              className="personalize-quick-btn"
+              onClick={() => onOpenPersonalize && onOpenPersonalize('complete')}
+            >
+              Customise full profile →
+            </button>
+          </div>
+          <h1 style={{ margin: '6px 0 14px', fontSize: '18px', textTransform: 'uppercase', letterSpacing: '-0.3px' }}>
+            {activeConditions.length > 0 && !activeConditions.includes('general_health')
+              ? `Personalised for ${activeConditions.map((c) => AVAILABLE_CONDITIONS.find((x) => x.id === c)?.label || c).join(' + ')}`
+              : 'Standard Balanced Guidelines (ICMR-NIN 2024)'}
+          </h1>
+
+          <div className="profile-tags">
+            {AVAILABLE_CONDITIONS.map((cond) => {
+              const active = activeConditions.includes(cond.id);
+              return (
+                <button
+                  key={cond.id}
+                  type="button"
+                  className={`profile-condition-pill ${active ? 'active' : ''}`}
+                  onClick={() => handleToggleCondition(cond.id)}
+                  title={cond.desc}
+                  disabled={recalculating}
+                >
+                  <i>{active ? '✓' : '+'}</i>
+                  <span>{cond.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick Active Preferences Summary */}
+          {((profile?.allergies && profile.allergies.length > 0) || (profile?.dietary_pattern && profile.dietary_pattern !== 'none') || (profile?.avoid_ingredients && profile.avoid_ingredients.length > 0)) && (
+            <div className="profile-meta-row" style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {profile?.allergies && profile.allergies.length > 0 && (
+                <span className="profile-meta-tag alert">
+                  Allergies: <b>{profile.allergies.join(', ')}</b>
+                </span>
+              )}
+              {profile?.dietary_pattern && profile.dietary_pattern !== 'none' && (
+                <span className="profile-meta-tag">
+                  Pattern: <b>{profile.dietary_pattern}</b>
+                </span>
+              )}
+              {profile?.avoid_ingredients && profile.avoid_ingredients.length > 0 && (
+                <span className="profile-meta-tag">
+                  Avoids: <b>{profile.avoid_ingredients.join(', ')}</b>
+                </span>
+              )}
+            </div>
+          )}
+        </section>
 
         {/* Allergy Status Strip */}
         <div className="allergy-strip standalone">
@@ -361,11 +503,19 @@ export default function FigmaAuditPage({
                     }}
                   >
                     <i />
-                    <b>{auditData.riskLabel}</b>
+                    <b>{auditData.gaugeShortLabel || 'Score'}</b>
                   </div>
                 </div>
               </div>
-              <b className="risk-label">{auditData.riskLabel}</b>
+              <b
+                className="risk-label"
+                style={{
+                  borderColor: auditData.severityColor,
+                  color: auditData.severityColor,
+                }}
+              >
+                {auditData.riskLabel}
+              </b>
               <div className="subscores">
                 <div>
                   <strong>{auditData.nutrientRating}</strong>

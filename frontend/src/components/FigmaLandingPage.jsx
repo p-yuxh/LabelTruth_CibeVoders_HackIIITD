@@ -86,10 +86,12 @@ export default function FigmaLandingPage({
   onSearch,
   onOpenAuth,
   onOpenAccount,
+  onOpenPersonalize,
   onOpenEvidenceLogs,
   onOpenLegal,
   isLoggedIn,
   user,
+  profile,
   loading = false,
 }) {
   const [openFaq, setOpenFaq] = useState(0);
@@ -97,6 +99,11 @@ export default function FigmaLandingPage({
   const [productQuery, setProductQuery] = useState('');
   const [compareFilter, setCompareFilter] = useState('All products');
   const searchRef = useRef(null);
+
+  const activeCount =
+    (profile?.dietary_conditions?.filter((c) => c !== 'general_health')?.length || 0) +
+    (profile?.allergies?.length || 0) +
+    (profile?.avoid_ingredients?.length || 0);
 
   useEffect(() => {
     const updateProgress = () => {
@@ -151,6 +158,15 @@ export default function FigmaLandingPage({
           <a href="#faq">FAQ</a>
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            className="personalize-nav-btn"
+            onClick={() => onOpenPersonalize && onOpenPersonalize('complete')}
+            title="Personalise your health conditions and dietary preferences"
+          >
+            Personalise
+            {activeCount > 0 && <span className="header-badge">{activeCount}</span>}
+          </button>
           <button
             type="button"
             className="audit-history"

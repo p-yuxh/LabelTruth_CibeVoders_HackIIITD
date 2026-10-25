@@ -4,10 +4,12 @@
  */
 
 export function getSeverityColor(score) {
-  if (score == null || isNaN(score)) return '#68717e';
-  const severity = Math.min(10, Math.max(0, Number(score)));
-  const lightness = 78 - severity * 4.2;
-  return `hsl(2 72% ${lightness}%)`;
+  if (score == null || isNaN(score)) return 'var(--rating-nodata-bg)';
+  const num = Number(score);
+  if (num <= 3.0) return 'var(--rating-good-bg)';
+  if (num <= 5.0) return 'var(--rating-moderate-bg)';
+  if (num <= 7.0) return 'var(--rating-poor-bg)';
+  return 'var(--rating-very-poor-bg)';
 }
 
 export function getNeedleAngle(score) {
@@ -62,24 +64,40 @@ export function adaptAuditData(auditResult, activePreferences = []) {
 
   // Scoring
   const scoring = data.personalized_scoring || {};
-  const personalisedRating = scoring.personalized_rating != null
-    ? Number(scoring.personalized_rating)
-    : (data.personalised_rating != null ? Number(data.personalised_rating) : null);
+  const personalisedRating = scoring.product_rating != null
+    ? Number(scoring.product_rating)
+    : (scoring.personalized_rating != null
+      ? Number(scoring.personalized_rating)
+      : (data.personalised_rating != null ? Number(data.personalised_rating) : null));
 
-  const nutrientRating = scoring.subscores?.nutrient_rating != null
-    ? Number(scoring.subscores.nutrient_rating).toFixed(2)
-    : (scoring.nutrient_score != null ? Number(scoring.nutrient_score).toFixed(2) : '—');
+  const nutrientRating = scoring.nutrient_rating != null
+    ? Number(scoring.nutrient_rating).toFixed(2)
+    : (scoring.subscores?.nutrient_rating != null
+      ? Number(scoring.subscores.nutrient_rating).toFixed(2)
+      : (scoring.nutrient_score != null ? Number(scoring.nutrient_score).toFixed(2) : '—'));
 
-  const ingredientRating = scoring.subscores?.ingredient_rating != null
-    ? Number(scoring.subscores.ingredient_rating).toFixed(2)
-    : (scoring.ingredient_score != null ? Number(scoring.ingredient_score).toFixed(2) : '—');
+  const ingredientRating = scoring.ingredient_rating != null
+    ? Number(scoring.ingredient_rating).toFixed(2)
+    : (scoring.subscores?.ingredient_rating != null
+      ? Number(scoring.subscores.ingredient_rating).toFixed(2)
+      : (scoring.ingredient_score != null ? Number(scoring.ingredient_score).toFixed(2) : '—'));
 
   let riskLabel = 'Moderate fit';
+  let gaugeShortLabel = 'Moderate';
   if (personalisedRating != null) {
-    if (personalisedRating <= 3.0) riskLabel = 'Good fit / within limits';
-    else if (personalisedRating <= 5.0) riskLabel = 'Moderate fit';
-    else if (personalisedRating <= 7.0) riskLabel = 'Poor fit / elevated risk';
-    else riskLabel = 'High risk / exceeds limits';
+    if (personalisedRating <= 3.0) {
+      riskLabel = 'Good fit / within limits';
+      gaugeShortLabel = 'Good fit';
+    } else if (personalisedRating <= 5.0) {
+      riskLabel = 'Moderate fit';
+      gaugeShortLabel = 'Moderate';
+    } else if (personalisedRating <= 7.0) {
+      riskLabel = 'Poor fit / elevated risk';
+      gaugeShortLabel = 'Poor fit';
+    } else {
+      riskLabel = 'High risk / exceeds limits';
+      gaugeShortLabel = 'High risk';
+    }
   }
 
   // Allergy Check
@@ -145,16 +163,19 @@ export function adaptAuditData(auditResult, activePreferences = []) {
 
   // Nutrient Breakdown Table
   let nutrientBreakdownRows = [];
-  if (scoring.details?.nutrient_breakdown && Array.isArray(scoring.details.nutrient_breakdown)) {
-    nutrientBreakdownRows = scoring.details.nutrient_breakdown.map((row) => [
-      row.nutrient || 'Nutrient',
+  const rawBreakdown = scoring.nutrient_breakdown || scoring.details?.nutrient_breakdown;
+  if (rawBreakdown && Array.isArray(rawBreakdown)) {
+    nutrientBreakdownRows = rawBreakdown.map((row) => [
+      row.name || row.nutrient || 'Nutrient',
       row.actual != null ? `${row.actual}${row.unit || 'g'}` : '—',
       row.limit != null ? `${row.limit}${row.unit || 'g'}` : '—',
-      row.excess_pct != null ? (row.excess_pct > 0 ? `+${row.excess_pct.toFixed(1)}%` : `${row.excess_pct.toFixed(1)}%`) : '0%',
-      `${row.risk_score != null ? row.risk_score : 1}/10`,
+      row.excess_pct != null
+        ? (Number(row.excess_pct) > 0 ? `+${Number(row.excess_pct).toFixed(1)}%` : `${Number(row.excess_pct).toFixed(1)}%`)
+        : '0%',
+      `${row.r_k != null ? row.r_k : (row.risk_score != null ? row.risk_score : 1)}/10`,
       String(row.weight || 1),
       row.basis || 'Per serving',
-      row.source || 'ICMR-NIN 2024',
+      row.source_name || row.source || 'ICMR-NIN 2024',
     ]);
   } else {
     // Generate from available nutrition metrics
@@ -187,8 +208,16 @@ export function adaptAuditData(auditResult, activePreferences = []) {
 
   // Top Contributing Ingredients Table
   let topIngredientsRows = [];
-  if (scoring.details?.top_contributing_ingredients && Array.isArray(scoring.details.top_contributing_ingredients)) {
-    topIngredientsRows = scoring.details.top_contributing_ingredients;
+  const rawTopIngs = scoring.top_ingredients || scoring.details?.top_contributing_ingredients;
+  if (rawTopIngs && Array.isArray(rawTopIngs)) {
+    topIngredientsRows = rawTopIngs.map((ing, idx) => ({
+      name: ing.name || `Ingredient #${idx + 1}`,
+      position: ing.position != null ? `#${ing.position}` : `#${idx + 1}`,
+      weight: ing.position_weight ?? (idx === 0 ? 3 : (idx === 1 ? 2 : 1)),
+      risk: ing.risk_score != null ? `${ing.risk_score}/10` : (ing.is_flagged ? '8/10' : '3/10'),
+      reason: ing.flag_reason || (ing.is_flagged ? 'Flagged ingredient risk.' : 'Standard recipe ingredient.'),
+      citation: ing.source_name || 'FSSAI Standards',
+    }));
   } else if (ingredients.length > 0) {
     topIngredientsRows = ingredients.slice(0, 5).map((ing, idx) => ({
       name: ing.name || `Ingredient #${idx + 1}`,
@@ -236,6 +265,7 @@ export function adaptAuditData(auditResult, activePreferences = []) {
     severityColor: getSeverityColor(personalisedRating),
     needleAngle: getNeedleAngle(personalisedRating),
     riskLabel,
+    gaugeShortLabel,
     nutrientRating,
     ingredientRating,
     // Allergy

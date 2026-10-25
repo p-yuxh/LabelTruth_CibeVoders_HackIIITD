@@ -18,6 +18,7 @@ function MainApp() {
     profile,
     isLoggedIn,
     openAuth,
+    openPersonalize,
     setAccountModalOpen,
     openLegal,
   } = useAuth();
@@ -262,13 +263,25 @@ function MainApp() {
       {adaptedAuditData ? (
         <FigmaAuditPage
           auditData={adaptedAuditData}
+          rawProductData={auditResult?.data}
           onSearch={handleSearch}
           onBack={() => setAuditResult(null)}
           onOpenEvidenceLogs={() => setEvidenceModalOpen(true)}
           onOpenAuth={openAuth}
           onOpenAccount={() => setAccountModalOpen(true)}
+          onOpenPersonalize={openPersonalize}
+          onUpdateScoring={(newScores) => {
+            setAuditResult((prev) => ({
+              ...prev,
+              data: {
+                ...prev.data,
+                personalized_scoring: newScores,
+              },
+            }));
+          }}
           isLoggedIn={isLoggedIn}
           user={user}
+          profile={profile}
           loading={loading}
         />
       ) : (
@@ -276,10 +289,12 @@ function MainApp() {
           onSearch={handleSearch}
           onOpenAuth={openAuth}
           onOpenAccount={() => setAccountModalOpen(true)}
+          onOpenPersonalize={openPersonalize}
           onOpenEvidenceLogs={() => setEvidenceModalOpen(true)}
           onOpenLegal={openLegal}
           isLoggedIn={isLoggedIn}
           user={user}
+          profile={profile}
           loading={loading}
         />
       )}
