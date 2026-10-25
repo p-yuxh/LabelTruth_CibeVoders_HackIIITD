@@ -502,12 +502,10 @@ class LabelTruthClaimsAuditor:
 
     def _summarize_lab_coverage(self, search_results: List, lab_url: str) -> Dict[str, Any]:
         lab_hits = [r for r in search_results if r.get("type") == "lab_test_coverage"]
-        clean_lab_url = lab_url.replace("consumervoice.org", "consumer-voice.org") if lab_url else "https://consumer-voice.org/category/food/"
+        clean_lab_url = (lab_url or "").strip()
         if lab_hits:
             hit = lab_hits[0]
-            raw_url = hit.get("url") or clean_lab_url
-            if "consumervoice.org" in raw_url:
-                raw_url = raw_url.replace("consumervoice.org", "consumer-voice.org")
+            raw_url = (hit.get("url") or clean_lab_url).strip()
             return {
                 "has_lab_tests": True,
                 "summary": hit.get("snippet") or "Independent consumer laboratory tests audited sugar and ingredient claims.",

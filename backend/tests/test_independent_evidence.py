@@ -396,3 +396,384 @@ def test_personalized_rating_and_allergy_results_identical_with_and_without_evid
     # Allergy check must be 100% identical
     assert res_without["allergy_check"]["allergy_status"] == res_with["allergy_check"]["allergy_status"]
     assert res_without["show_scores"] == res_with["show_scores"]
+
+
+# =============================================================================
+# SECTION 8 REQUIREMENTS: LAB REPORT LINK INTEGRITY, PROVENANCE & VERIFICATION
+# =============================================================================
+
+def test_url_not_in_retrieved_results_is_rejected_and_hidden(evidence_service):
+    """
+    Provenance rule: If any URL in LLM output is not exactly in the retrieved set
+    for that product, drop it, set status 'reported_not_verified' with reason 'link not traceable', and log it.
+    """
+    retrieved_map = {
+        1: "https://www.fssai.gov.in/upload/advisories/2024/04/66150a0a5ad8fDirection_Health_Drink.pdf"
+    }
+
+    # Record claiming source_id=1 but with a different/invented URL
+    fake_record = {
+        "record_id": "test_untraceable_001",
+        "brand": "Cadbury",
+        "product": "Cadbury Bournvita",
+        "source_id": 1,
+        "original_report_url": "https://www.fssai.gov.in/invented/path/not_retrieved.pdf",
+        "lab_name": "Spectro Analytical Labs",
+        "verified_by": "manual_check",
+        "verified_at": "2026-10-25",
+    }
+
+    status, reason = evidence_service.evaluate_acceptance_rules(
+        record=fake_record,
+        brand="Cadbury",
+        product_name="Cadbury Bournvita",
+        retrieved_urls_map=retrieved_map,
+    )
+    assert status == "reported_not_verified"
+    assert "link not traceable" in reason.lower()
+
+    # Record missing source_id altogether
+    no_id_record = {
+        "record_id": "test_untraceable_002",
+        "brand": "Cadbury",
+        "product": "Cadbury Bournvita",
+        "original_report_url": "https://www.fssai.gov.in/upload/advisories/2024/04/66150a0a5ad8fDirection_Health_Drink.pdf",
+        "lab_name": "Spectro Analytical Labs",
+        "verified_by": "manual_check",
+        "verified_at": "2026-10-25",
+    }
+    status2, reason2 = evidence_service.evaluate_acceptance_rules(
+        record=no_id_record,
+        brand="Cadbury",
+        product_name="Cadbury Bournvita",
+        retrieved_urls_map=retrieved_map,
+    )
+    assert status2 == "reported_not_verified"
+    assert "link not traceable" in reason2.lower()
+
+
+def test_host_swapping_never_occurs():
+    """
+    Host swapping rule: input 'consumervoice.org/...' stays unchanged
+    unless a redirect returns another URL. Never swap the host and keep the path.
+    """
+    from app.services.link_verifier import normalize_and_sanitize_url
+
+    # Allowed domains list
+    allowed = ["consumer-voice.org", "consumervoice.org"]
+    url = "https://consumervoice.org/wp-content/uploads/report.pdf"
+    cleaned, err = normalize_and_sanitize_url(url, allowed_domains=allowed)
+    assert cleaned == "https://consumervoice.org/wp-content/uploads/report.pdf"
+    assert "consumer-voice.org" not in cleaned
+
+
+def test_misspelled_real_filenames_preserved():
+    """
+    Real filenames can contain typos (e.g. '.../Cold-Pressed-Groundnut-Oils-Comparative-tesing.pdf').
+    The exact path must be preserved without autocorrecting.
+    """
+    from app.services.link_verifier import normalize_and_sanitize_url
+
+    real_fixture = "https://consumer-voice.org/wp-content/uploads/2026/08/Cold-Pressed-Groundnut-Oils-Comparative-tesing.pdf"
+    cleaned, err = normalize_and_sanitize_url(real_fixture)
+    assert err is None
+    assert cleaned == real_fixture
+    assert "Comparative-tesing.pdf" in cleaned
+
+
+def test_percent_encoded_paths_preserved():
+    """
+    Percent-encoded paths are preserved and spaces are encoded to %20.
+    """
+    from app.services.link_verifier import normalize_and_sanitize_url
+
+    fixture = "https://consumeraffairs.nic.in/sites/default/files/file-uploads/ctocpas/Packaged%20Toned%20Milk.pdf"
+    cleaned, err = normalize_and_sanitize_url(fixture)
+    assert err is None
+    assert cleaned == fixture
+    assert "Packaged%20Toned%20Milk.pdf" in cleaned
+
+    # Raw space gets encoded to %20
+    with_space = "https://consumeraffairs.nic.in/sites/default/files/file-uploads/ctocpas/Packaged Toned Milk.pdf."
+    cleaned2, err2 = normalize_and_sanitize_url(with_space)
+    assert err2 is None
+    assert cleaned2 == fixture
+
+
+def test_relative_hrefs_never_rendered_links_start_with_https():
+    """
+    Relative hrefs are never allowed; every rendered link in UI must start with https://.
+    """
+    from app.services.link_verifier import normalize_and_sanitize_url
+
+    rel_url = "/files/reports/2024/health_drink.pdf"
+    cleaned, err = normalize_and_sanitize_url(rel_url)
+    assert cleaned is None
+    assert "relative" in err.lower()
+
+    # Schemeless URL gets https://
+    schemeless = "consumer-voice.org/food/butter/"
+    cleaned_schemeless, err_s = normalize_and_sanitize_url(schemeless)
+    assert err_s is None
+    assert cleaned_schemeless.startswith("https://")
+
+
+def test_candidate_selection_different_brand_and_no_match(evidence_service):
+    """
+    Two results with the first for a different brand: the matching one is chosen;
+    if none match, return NO_MATCH. Never fall back to the first result.
+    """
+    candidates = [
+        {
+            "title": "Horlicks Malt Nutrition Analysis",
+            "snippet": "Laboratory test report on Horlicks Malt Drink for Sugar Content. Published: September 2024.",
+            "url": "https://consumer-voice.org/category/product-ranking/",
+            "source_id": 1,
+            "tier": "C",
+        },
+        {
+            "title": "Cadbury Bournvita Nutrition Analysis",
+            "snippet": "Independent laboratory testing on Cadbury Bournvita health drink evaluating Sugar Content. Published: October 2024.",
+            "url": "https://consumer-voice.org/category/product-ranking/",
+            "source_id": 2,
+            "tier": "C",
+        },
+    ]
+
+    retrieved_map = {
+        1: "https://consumer-voice.org/category/product-ranking/",
+        2: "https://consumer-voice.org/category/product-ranking/",
+    }
+
+    # Query is for Cadbury Bournvita -> candidate 2 must be chosen, not candidate 1
+    best, rejected = evidence_service.select_best_report_candidate(
+        candidates=candidates,
+        product_name="Cadbury Bournvita",
+        brand="Cadbury",
+        metric="Sugar",
+        retrieved_urls_map=retrieved_map,
+    )
+    assert best is not None
+    assert best["source_id"] == 2
+    assert "Bournvita" in best["title"]
+    assert len(rejected) == 1
+    assert rejected[0]["source_id"] == 1
+
+    # Query for Amul Butter -> neither Horlicks nor Bournvita matches -> NO_MATCH
+    best_amul, rejected_amul = evidence_service.select_best_report_candidate(
+        candidates=candidates,
+        product_name="Amul Butter",
+        brand="Amul",
+        metric="Fat",
+        retrieved_urls_map=retrieved_map,
+    )
+    assert best_amul is None
+    assert len(rejected_amul) == 2
+
+
+def test_news_article_without_original_report_rejected(evidence_service):
+    """
+    A news article without the original report is rejected.
+    """
+    news_candidate = [
+        {
+            "title": "Times of India: News Summary on Nestle Maggi Instant Noodles",
+            "snippet": "Breaking news report by Times of India on Nestle Maggi sodium levels in noodles. Date: 2024-05-01.",
+            "url": "https://consumer-voice.org/food/instant-noodles/",
+            "source_id": 1,
+            "is_news_summary": True,
+            "original_report_url": "",
+        }
+    ]
+    best, rejected = evidence_service.select_best_report_candidate(
+        candidates=news_candidate,
+        product_name="Maggi Noodles",
+        brand="Nestle",
+        metric="Sodium",
+    )
+    assert best is None
+    assert len(rejected) == 1
+    assert "news" in rejected[0]["reason"].lower()
+
+
+def test_link_verification_status_codes_and_soft404():
+    """
+    404/410/DNS failure/soft 404 -> dead;
+    403/429/login or subscription gate -> restricted;
+    timeout -> error after one retry.
+    """
+    import httpx
+    from app.services.link_verifier import LinkVerifier
+
+    def mock_handler(request):
+        url_str = str(request.url)
+        if "dead-404" in url_str:
+            return httpx.Response(404)
+        elif "dead-410" in url_str:
+            return httpx.Response(410)
+        elif "soft-404" in url_str:
+            return httpx.Response(200, text="<html><body>404 Not Found - Article Not Found</body></html>")
+        elif "restricted-403" in url_str:
+            return httpx.Response(403)
+        elif "restricted-429" in url_str:
+            return httpx.Response(429)
+        elif "login-gate" in url_str:
+            return httpx.Response(200, text="<html><body>Please log in to continue</body></html>")
+        elif "timeout-simulate" in url_str:
+            raise httpx.ReadTimeout("Mock read timeout")
+        return httpx.Response(200, text="<html><body>Cadbury Bournvita Tested Report</body></html>", headers={"Content-Type": "text/html"})
+
+    mock_client = httpx.Client(transport=httpx.MockTransport(mock_handler))
+    verifier = LinkVerifier()
+
+    # 1. 404 -> dead
+    res_404 = verifier.verify_link("https://consumer-voice.org/dead-404", client=mock_client)
+    assert res_404["link_status"] == "dead"
+    assert res_404["http_status"] == 404
+
+    # 2. 410 -> dead
+    res_410 = verifier.verify_link("https://consumer-voice.org/dead-410", client=mock_client)
+    assert res_410["link_status"] == "dead"
+    assert res_410["http_status"] == 410
+
+    # 3. Soft 404 -> dead
+    res_soft = verifier.verify_link("https://consumer-voice.org/soft-404", client=mock_client)
+    assert res_soft["link_status"] == "dead"
+    assert "soft 404" in res_soft["error_reason"].lower()
+
+    # 4. 403 -> restricted
+    res_403 = verifier.verify_link("https://consumer-voice.org/restricted-403", client=mock_client)
+    assert res_403["link_status"] == "restricted"
+    assert res_403["is_restricted"] is True
+
+    # 5. 429 -> restricted
+    res_429 = verifier.verify_link("https://consumer-voice.org/restricted-429", client=mock_client)
+    assert res_429["link_status"] == "restricted"
+
+    # 6. Subscription domain join.consumer-voice.org -> restricted
+    res_sub = verifier.verify_link("https://join.consumer-voice.org/detailed-results", client=mock_client)
+    assert res_sub["link_status"] == "restricted"
+    assert res_sub["is_restricted"] is True
+
+    # 7. Timeout -> error after retry
+    res_timeout = verifier.verify_link("https://consumer-voice.org/timeout-simulate", client=mock_client)
+    assert res_timeout["link_status"] == "error"
+
+    # 8. Valid matching -> reachable
+    res_ok = verifier.verify_link(
+        "https://consumer-voice.org/valid-report",
+        brand="Cadbury",
+        product_name="Bournvita",
+        client=mock_client,
+    )
+    assert res_ok["link_status"] == "reachable"
+
+
+def test_dead_links_render_no_clickable_link_and_sit_under_unverified(evidence_service):
+    """
+    Dead links render no clickable link and sit under 'Reported, not verified'
+    with 'Link unavailable (checked <date>)'.
+    """
+    record_with_dead_link = {
+        "record_id": "lab_test_dead_001",
+        "brand": "Cadbury",
+        "product": "Cadbury Bournvita",
+        "original_report_url": "https://consumer-voice.org/dead-404-report.pdf",
+        "lab_name": "Spectro Labs",
+        "link_status": "dead",
+        "checked_at": "2026-10-25T07:00:00Z",
+        "error_reason": "HTTP 404 Not Found",
+        "verified_by": "manual_check",
+        "verified_at": "2026-10-25",
+    }
+    status, reason = evidence_service.evaluate_acceptance_rules(
+        record=record_with_dead_link,
+        brand="Cadbury",
+        product_name="Cadbury Bournvita",
+    )
+    assert status == "reported_not_verified"
+    assert "link unavailable" in reason.lower()
+    # Clickable link must be cleared
+    assert record_with_dead_link["original_report_url"] is None
+
+
+def test_browse_links_never_appear_inside_evidence_cards_and_carry_not_evidence_label(evidence_service):
+    """
+    Browse links are category-specific fallbacks:
+    - Never count as evidence.
+    - Never appear inside accepted evidence cards.
+    - Always carry the 'not evidence' label.
+    """
+    res = evidence_service.get_evidence_for_product(
+        query="Amul Pasteurized Butter",
+        product_name="Amul Butter",
+        brand="Amul",
+        category="Butter",
+    )
+    section1 = res["section_1"]
+    assert section1["category_browse_url"] == "https://consumer-voice.org/food/butter/"
+    assert "not evidence for this product" in section1["category_browse_text"]
+
+    # In accepted cards: none contains the browse link
+    for card in section1["accepted"]:
+        assert card.get("original_report_url") != section1["category_browse_url"]
+
+
+def test_host_not_in_allowed_domains_is_hidden_and_logged(evidence_service):
+    """
+    A link whose host is not listed in allowed_domains.json is hidden and logged.
+    """
+    record_unallowed_host = {
+        "record_id": "lab_unallowed_host_001",
+        "brand": "Cadbury",
+        "product": "Cadbury Bournvita",
+        "original_report_url": "https://unauthorized-testing-blog.net/report.pdf",
+        "lab_name": "Unknown Lab",
+        "verified_by": "manual_check",
+        "verified_at": "2026-10-25",
+    }
+    status, reason = evidence_service.evaluate_acceptance_rules(
+        record=record_unallowed_host,
+        brand="Cadbury",
+        product_name="Cadbury Bournvita",
+    )
+    assert status == "reported_not_verified"
+    assert "allowed_domains" in reason.lower()
+
+
+def test_seed_entries_without_verified_by_or_verified_at_are_rejected(evidence_service):
+    """
+    Seed entries without verified_by/verified_at are rejected.
+    """
+    unverified_seed = {
+        "record_id": "lab_unverified_seed_001",
+        "brand": "Cadbury",
+        "product": "Cadbury Bournvita",
+        "original_report_url": "https://www.fssai.gov.in/upload/advisories/2024/04/66150a0a5ad8fDirection_Health_Drink.pdf",
+        "lab_name": "FSSAI Lab",
+        # missing verified_by and verified_at
+    }
+    status, reason = evidence_service.evaluate_acceptance_rules(
+        record=unverified_seed,
+        brand="Cadbury",
+        product_name="Cadbury Bournvita",
+    )
+    assert status == "reported_not_verified"
+    assert "verified_by" in reason.lower() or "verified_at" in reason.lower()
+
+
+def test_all_seed_files_pass_validation_and_are_not_dead(evidence_service):
+    """
+    Validates that every single seed record in the database/JSON files has
+    verified_by, verified_at, an allowed domain, and is not dead.
+    """
+    for seed in evidence_service.lab_seeds:
+        rid = seed.get("record_id")
+        assert seed.get("verified_by"), f"Seed {rid} missing verified_by"
+        assert seed.get("verified_at"), f"Seed {rid} missing verified_at"
+        url = seed.get("original_report_url")
+        if url:
+            from urllib.parse import urlparse
+            host = urlparse(url).netloc.lower().split(":")[0]
+            assert host in evidence_service.allowed_domains, f"Seed {rid} host {host} not in allowed domains"
+

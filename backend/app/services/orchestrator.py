@@ -106,10 +106,12 @@ class AuditOrchestrator:
                 evidence_service = IndependentEvidenceService()
                 p_name_val = product_data.get("product_name", {}).get("value", cleaned_query)
                 p_brand_val = product_data.get("brand", {}).get("value", "")
+                p_cat_val = product_data.get("category", {}).get("value", "") if isinstance(product_data.get("category"), dict) else str(product_data.get("category") or "")
                 product_data["independent_evidence"] = evidence_service.get_evidence_for_product(
                     query=cleaned_query,
                     product_name=p_name_val,
                     brand=p_brand_val,
+                    category=p_cat_val,
                     claims=product_data.get("front_pack_claims", []),
                 )
                 product_data["front_pack_claims"] = evidence_service.apply_evidence_to_claim_verdicts(

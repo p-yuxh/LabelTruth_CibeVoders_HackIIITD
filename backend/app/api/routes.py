@@ -351,6 +351,16 @@ async def get_independent_evidence(query: str = "", product_name: str = "", bran
     return svc.get_evidence_for_product(query=query, product_name=product_name, brand=brand, category=category)
 
 
+@router.get(
+    "/diagnostics/evidence-links",
+    summary="Evidence Link Diagnostics (Admin)",
+    description="Returns structured metrics for retrieved, accepted, dead, restricted, and error links."
+)
+async def get_evidence_link_diagnostics():
+    from app.services.link_verifier import link_verifier
+    return link_verifier.diagnostics.get_diagnostics()
+
+
 @router.get("/health", summary="Health Check")
 async def health_check():
     return {

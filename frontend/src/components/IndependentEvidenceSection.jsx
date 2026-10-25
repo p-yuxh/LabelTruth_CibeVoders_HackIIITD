@@ -59,7 +59,7 @@ export default function IndependentEvidenceSection({ evidence, category }) {
                 <a
                   href={browseUrl}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="citation-link"
                   style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
@@ -95,6 +95,9 @@ export default function IndependentEvidenceSection({ evidence, category }) {
                 ? 'Tier C: Comparative Test Org'
                 : 'Tier D: Reference Data';
 
+            const reportHref = report.final_url || report.original_report_url;
+            const isRestricted = report.link_status === 'restricted' || report.is_restricted;
+
             return (
               <article key={report.record_id} className="evidence-item-card">
                 {/* Meta Row: Tier, Source, Age Badge */}
@@ -121,16 +124,23 @@ export default function IndependentEvidenceSection({ evidence, category }) {
                     </span>
                   </div>
 
-                  {report.original_report_url && (
-                    <a
-                      href={report.original_report_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="citation-link"
-                      style={{ fontSize: '0.78rem' }}
-                    >
-                      <ExternalLink size={12} /> View Primary Report PDF
-                    </a>
+                  {reportHref && (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <a
+                        href={reportHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="citation-link"
+                        style={{ fontSize: '0.78rem' }}
+                      >
+                        <ExternalLink size={12} /> Open original report
+                      </a>
+                      {isRestricted && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--verdict-misleading)', fontWeight: 600 }}>
+                          (May require subscription)
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -260,19 +270,30 @@ export default function IndependentEvidenceSection({ evidence, category }) {
                       {item.raw_text_snippet || 'No text snippet attached.'}
                     </p>
 
-                    {item.discovery_url && (
-                      <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      {item.discovery_url && (
                         <a
                           href={item.discovery_url}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="citation-link"
                           style={{ fontSize: '0.74rem' }}
                         >
                           <ExternalLink size={11} /> View Discovery Link
                         </a>
-                      </div>
-                    )}
+                      )}
+                      {item.archived_url && (
+                        <a
+                          href={item.archived_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="citation-link"
+                          style={{ fontSize: '0.74rem' }}
+                        >
+                          <ExternalLink size={11} /> Archived copy
+                        </a>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

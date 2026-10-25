@@ -1,5 +1,7 @@
 import logging
+import socket
 from typing import AsyncGenerator
+from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.config import settings
 from app.models.evidence_log import Base
@@ -11,10 +13,35 @@ _engine = None
 _sessionmaker = None
 
 
+def _is_postgres_available(url_str: str) -> bool:
+    """Synchronously test if PostgreSQL port is open to avoid runtime delays/errors."""
+    try:
+        parsed = urlparse(url_str)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 5432
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except Exception:
+        return False
+
+
 def get_engine():
     global _engine
     if _engine is None:
         try:
+            if "postgresql" in settings.DATABASE_URL:
+                if not _is_postgres_available(settings.DATABASE_URL):
+                    logger.warning(
+                        f"PostgreSQL at {settings.DATABASE_URL} is unreachable. "
+                        f"Switching immediately to local fallback database: {settings.FALLBACK_DATABASE_URL}"
+                    )
+                    _engine = create_async_engine(
+                        settings.FALLBACK_DATABASE_URL,
+                        echo=False,
+                        future=True,
+                    )
+                    return _engine
+
             # First attempt primary DATABASE_URL (PostgreSQL)
             _engine = create_async_engine(
                 settings.DATABASE_URL,

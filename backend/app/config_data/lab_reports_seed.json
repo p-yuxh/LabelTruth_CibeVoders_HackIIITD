@@ -5,7 +5,7 @@
     "source_name": "FSSAI Statutory Directive & Gazette Advisory",
     "source_type": "statutory_regulator",
     "tier": "A",
-    "discovery_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
     "original_report_url": "https://www.fssai.gov.in/upload/advisories/2024/04/66150a0a5ad8fDirection_Health_Drink.pdf",
     "publication_date": "2024-04-02",
     "test_date": "2024-04-02",
@@ -40,7 +40,9 @@
     "confidence": 0.98,
     "needs_review": false,
     "raw_text_snippet": "Official FSSAI statutory direction mandating e-commerce platforms and brand manufacturers to remove malt-based beverages including Bournvita from 'Health Drink' categorization.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_bournvita_sugar_002",
@@ -48,7 +50,7 @@
     "source_name": "Consumer Voice India Comparative Test",
     "source_type": "independent_testing_organisation",
     "tier": "C",
-    "discovery_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
     "original_report_url": "https://www.fssai.gov.in/upload/advisories/2024/04/66150a0a5ad8fDirection_Health_Drink.pdf",
     "publication_date": "2024-04-10",
     "test_date": "2024-03-15",
@@ -83,7 +85,9 @@
     "confidence": 0.95,
     "needs_review": false,
     "raw_text_snippet": "Comparative testing of Cadbury Bournvita at NABL accredited facility revealed 37.4g total sugar per 100g compared to declared 32.2g per 100g (+16.1% gap).",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_bournvita_news_unverified_003",
@@ -91,7 +95,7 @@
     "source_name": "Indian Retail News Portal",
     "source_type": "news_article",
     "tier": "C",
-    "discovery_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
     "original_report_url": "",
     "publication_date": "2024-05-12",
     "test_date": null,
@@ -126,7 +130,9 @@
     "confidence": 0.35,
     "needs_review": true,
     "raw_text_snippet": "Online news commentary citing secondary unverified claims regarding sugar percentage without attaching the official NABL laboratory certificate.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_maggi_sodium_palm_001",
@@ -169,7 +175,9 @@
     "confidence": 0.96,
     "needs_review": false,
     "raw_text_snippet": "Comparative testing of Maggi 2-Minute Masala Noodles found 892mg sodium per 70g pack compared to 850mg declared (+4.9% variance, conforming to FSSAI labelling tolerance). Palmolein oil confirmed as primary frying lipid.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_maggi_lead_msg_historical_002",
@@ -212,7 +220,9 @@
     "confidence": 0.98,
     "needs_review": false,
     "raw_text_snippet": "Historical 2015 CFL Kolkata test report regarding lead and MSG in instant noodles. Maintained strictly for historical context.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_maggi_milk_coliform_invalid_003",
@@ -220,7 +230,7 @@
     "source_name": "State Food Safety Raw Milk Sweep",
     "source_type": "government_inspection",
     "tier": "A",
-    "discovery_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
     "original_report_url": "https://www.fssai.gov.in/cms/food-safety-and-standards-regulations.php",
     "publication_date": "2024-11-01",
     "test_date": "2024-10-15",
@@ -255,7 +265,9 @@
     "confidence": 0.4,
     "needs_review": true,
     "raw_text_snippet": "Routine microbiological fluid dairy surveillance report catalogued under incorrect ambient category.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_lays_palmolein_satfat_001",
@@ -263,7 +275,7 @@
     "source_name": "Consumer Voice India Comparative Potato Chips Test",
     "source_type": "independent_testing_organisation",
     "tier": "C",
-    "discovery_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
     "original_report_url": "https://www.fssai.gov.in/upload/notifications/2020/12/5fd87c6a0f6adGazette_Notification_Labelling_Display_14_12_2020.pdf",
     "publication_date": "2024-06-20",
     "test_date": "2024-05-18",
@@ -298,7 +310,9 @@
     "confidence": 0.95,
     "needs_review": false,
     "raw_text_snippet": "Independent testing at Shriram Institute confirmed Lay's Classic Salted potato chips contain 34.6% total fat and 14.8% saturated fat per 100g (4.7g per 30g serve), verifying the use of Palmolein oil.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_lays_news_unverified_002",
@@ -306,7 +320,7 @@
     "source_name": "Consumer Watch Blog Post",
     "source_type": "consumer_blog",
     "tier": "C",
-    "discovery_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
     "original_report_url": "",
     "publication_date": "2025-01-10",
     "test_date": null,
@@ -341,7 +355,9 @@
     "confidence": 0.3,
     "needs_review": true,
     "raw_text_snippet": "Blog article quoting unverified claims regarding potato chips trans fat without attaching an accredited testing certificate.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_coke_zero_sweeteners_001",
@@ -384,7 +400,9 @@
     "confidence": 0.99,
     "needs_review": false,
     "raw_text_snippet": "NFL Ghaziabad surveillance testing verified 0.00g sugar per 100ml in Coca-Cola Zero Sugar. Artificial sweeteners Aspartame (180 mg/kg) and Acesulfame K (95 mg/kg) confirmed within statutory limits (max 700 mg/kg and 300 mg/kg respectively).",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_amul_butter_fat_moisture_001",
@@ -392,7 +410,7 @@
     "source_name": "Ministry of Consumer Affairs & NDDB Testing",
     "source_type": "government_comparative_testing",
     "tier": "A",
-    "discovery_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
     "original_report_url": "https://amul.com/products/amul-butter-info.php",
     "publication_date": "2024-07-15",
     "test_date": "2024-06-25",
@@ -427,7 +445,9 @@
     "confidence": 0.98,
     "needs_review": false,
     "raw_text_snippet": "Comparative testing of Amul Pasteurised Table Butter at NDDB CALF laboratory verified milk fat at 81.3% (minimum statutory limit 80.0%) and moisture at 15.4% (maximum limit 16.0%). Zero foreign fats detected.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_amul_milk_coliform_invalid_002",
@@ -435,7 +455,7 @@
     "source_name": "District Raw Milk Microbiological Sweep",
     "source_type": "government_inspection",
     "tier": "A",
-    "discovery_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
     "original_report_url": "https://www.fssai.gov.in/cms/food-safety-and-standards-regulations.php",
     "publication_date": "2023-08-10",
     "test_date": "2023-07-20",
@@ -470,7 +490,9 @@
     "confidence": 0.45,
     "needs_review": true,
     "raw_text_snippet": "Microbiological examination of raw village chilling centre milk supplies before pasteurisation processing.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_yogabar_protein_fibre_001",
@@ -513,7 +535,9 @@
     "confidence": 0.96,
     "needs_review": false,
     "raw_text_snippet": "Laboratory analysis at TUV India verified Yoga Bar Dark Chocolate Oats contains 6.3g protein (label: 6.5g) and 4.4g dietary fibre per 40g serving, conforming to front-of-pack claims.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_yogabar_trustified_unverified_002",
@@ -556,7 +580,9 @@
     "confidence": 0.4,
     "needs_review": true,
     "raw_text_snippet": "Trustified summary certificate card without the full NABL analytical test datasheet attached.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_parle_g_sugar_palm_001",
@@ -599,7 +625,9 @@
     "confidence": 0.98,
     "needs_review": false,
     "raw_text_snippet": "Comparative evaluation of glucose biscuits: Total sugars measured at 26.8% and total fat at 13.2% with palmolein oil detected.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_kurkure_sodium_fat_001",
@@ -607,8 +635,8 @@
     "source_name": "Consumer Voice Savory Snacks Study",
     "source_type": "independent_testing_organisation",
     "tier": "C",
-    "discovery_url": "https://consumer-voice.org/category/food/",
-    "original_report_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
+    "original_report_url": "https://consumer-voice.org/category/product-ranking/",
     "publication_date": "2024-03-12",
     "test_date": "2024-02-20",
     "lab_name": "Spectro Analytical Labs (NABL)",
@@ -642,7 +670,9 @@
     "confidence": 0.97,
     "needs_review": false,
     "raw_text_snippet": "Testing of Kurkure Masala Munch confirmed trans fat < 0.1g per 100g, sodium 920mg per 100g, and palmolein frying fat.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_kissan_jam_tss_sugar_001",
@@ -685,7 +715,9 @@
     "confidence": 0.99,
     "needs_review": false,
     "raw_text_snippet": "Regulatory sweep of fruit preserves: Kissan Mixed Fruit Jam verified at 68.5% total soluble solids and fruit content conforming to standards.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_frooti_sugar_pulp_001",
@@ -728,7 +760,9 @@
     "confidence": 0.98,
     "needs_review": false,
     "raw_text_snippet": "Surveillance analysis of mango beverages: Frooti verified at 15.3g total sugars per 100ml and 19.5% fruit pulp; zero synthetic colour detected.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_yippee_sodium_msg_001",
@@ -736,8 +770,8 @@
     "source_name": "Consumer Voice Comparative Instant Noodles Study",
     "source_type": "independent_testing_organisation",
     "tier": "C",
-    "discovery_url": "https://consumer-voice.org/category/food/",
-    "original_report_url": "https://consumer-voice.org/category/food/",
+    "discovery_url": "https://consumer-voice.org/category/product-ranking/",
+    "original_report_url": "https://consumer-voice.org/food/instant-noodles/",
     "publication_date": "2023-11-20",
     "test_date": "2023-10-15",
     "lab_name": "Shriram Institute for Industrial Research (NABL)",
@@ -771,7 +805,9 @@
     "confidence": 0.99,
     "needs_review": false,
     "raw_text_snippet": "Comparative testing of YiPPee noodles: Lead undetectable (<0.05 mg/kg), sodium measured at 1240mg per 100g, palmolein oil detected as primary frying fat.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   },
   {
     "record_id": "lab_paperboat_zero_sweeteners_001",
@@ -814,6 +850,96 @@
     "confidence": 0.99,
     "needs_review": false,
     "raw_text_snippet": "Analytical testing confirmed 0.0g sugar per 100ml and permitted sucralose sweetener within statutory ceiling.",
-    "fetched_at": "2026-10-24T18:00:00Z"
+    "fetched_at": "2026-10-24T18:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
+  },
+  {
+    "record_id": "lab_fixture_groundnut_oil_misspelled",
+    "section": "lab_regulatory",
+    "source_name": "Consumer Voice India Comparative Test",
+    "source_type": "independent_testing_organisation",
+    "tier": "C",
+    "discovery_url": "https://consumer-voice.org/food/edible-oil/",
+    "original_report_url": "https://consumer-voice.org/wp-content/uploads/2026/08/Cold-Pressed-Groundnut-Oils-Comparative-tesing.pdf",
+    "publication_date": "2026-08-15",
+    "test_date": "2026-07-20",
+    "lab_name": "Spectro Analytical Labs Ltd. (NABL Accredited)",
+    "accreditation_no": "TC-5982",
+    "accreditation_checked": true,
+    "accreditation_source_url": "https://nabl-india.org",
+    "method": "AOAC 965.33 (Peroxide Value in Edible Oils)",
+    "sample_count": 5,
+    "batch": "GN-2026-B1",
+    "brand": "P-Mark / Nature Fresh",
+    "product": "Cold Pressed Groundnut Oil",
+    "variant": "Cold Pressed",
+    "pack_size": "1L",
+    "category": "Edible Oil",
+    "parameter": "Peroxide Value & Purity",
+    "label_value": 5.0,
+    "lab_value": 4.2,
+    "unit": "meq/kg",
+    "basis": "per 100 g",
+    "lab_gap_pct": -16.0,
+    "brand_response": "Within statutory limit of 10 meq/kg.",
+    "regulator_action": "None on record.",
+    "age_years": 0.2,
+    "age_status": "recent",
+    "match": {
+      "same_product": true,
+      "same_metric": true
+    },
+    "status": "accepted",
+    "confidence": 0.95,
+    "needs_review": false,
+    "raw_text_snippet": "Comparative testing of cold pressed groundnut oils for peroxide value, acid value and fatty acid profile.",
+    "fetched_at": "2026-10-25T07:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
+  },
+  {
+    "record_id": "lab_fixture_toned_milk_percent_encoded",
+    "section": "lab_regulatory",
+    "source_name": "Ministry of Consumer Affairs Comparative Testing",
+    "source_type": "statutory_regulator",
+    "tier": "A",
+    "discovery_url": "https://consumeraffairs.nic.in/consumer-corner/comparative-test-of-consumer-products-and-services",
+    "original_report_url": "https://consumeraffairs.nic.in/sites/default/files/file-uploads/ctocpas/Packaged%20Toned%20Milk.pdf",
+    "publication_date": "2025-11-10",
+    "test_date": "2025-10-05",
+    "lab_name": "National Test House (NABL Accredited)",
+    "accreditation_no": "NTH-5021",
+    "accreditation_checked": true,
+    "accreditation_source_url": "https://consumeraffairs.nic.in",
+    "method": "IS 1224 (Determination of Fat in Milk by Gerber Method)",
+    "sample_count": 10,
+    "batch": "TM-BATCH-99",
+    "brand": "Amul / Mother Dairy",
+    "product": "Packaged Toned Milk",
+    "variant": "Toned Milk 3.0% Fat",
+    "pack_size": "500ml",
+    "category": "Milk",
+    "parameter": "Milk Fat & Solids Not Fat (SNF)",
+    "label_value": 3.0,
+    "lab_value": 3.05,
+    "unit": "g/100ml",
+    "basis": "per 100 ml",
+    "lab_gap_pct": 1.67,
+    "brand_response": "Complies with FSSAI standards for pasteurized toned milk.",
+    "regulator_action": "Statutory surveillance passed.",
+    "age_years": 0.95,
+    "age_status": "recent",
+    "match": {
+      "same_product": true,
+      "same_metric": true
+    },
+    "status": "accepted",
+    "confidence": 0.98,
+    "needs_review": false,
+    "raw_text_snippet": "Comparative testing of packaged toned milk brands across India for fat, SNF, and adulterants.",
+    "fetched_at": "2026-10-25T07:00:00Z",
+    "verified_by": "analyst_manual_check",
+    "verified_at": "2026-10-25"
   }
 ]

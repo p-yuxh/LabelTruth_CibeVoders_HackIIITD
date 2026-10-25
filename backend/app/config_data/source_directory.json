@@ -1,0 +1,144 @@
+{
+  "categories": {
+    "butter": {
+      "url": "https://consumer-voice.org/food/butter/",
+      "category_label": "butter",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "edible-oil": {
+      "url": "https://consumer-voice.org/food/edible-oil/",
+      "category_label": "edible oil",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "oil": {
+      "url": "https://consumer-voice.org/food/edible-oil/",
+      "category_label": "edible oil",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "groundnut oil": {
+      "url": "https://consumer-voice.org/food/edible-oil/",
+      "category_label": "edible oil",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "cooking oil": {
+      "url": "https://consumer-voice.org/food/edible-oil/",
+      "category_label": "edible oil",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "ghee": {
+      "url": "https://consumer-voice.org/food/ghee/",
+      "category_label": "ghee",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "milk": {
+      "url": "https://consumer-voice.org/food/milk/",
+      "category_label": "milk",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "toned milk": {
+      "url": "https://consumer-voice.org/food/milk/",
+      "category_label": "milk",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "paneer": {
+      "url": "https://consumer-voice.org/food/paneer/",
+      "category_label": "paneer",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "curd": {
+      "url": "https://consumer-voice.org/food/curd/",
+      "category_label": "curd",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "dahi": {
+      "url": "https://consumer-voice.org/food/curd/",
+      "category_label": "curd",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "instant-noodles": {
+      "url": "https://consumer-voice.org/food/instant-noodles/",
+      "category_label": "instant noodles",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "noodles": {
+      "url": "https://consumer-voice.org/food/instant-noodles/",
+      "category_label": "instant noodles",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "ketchup-and-sauces": {
+      "url": "https://consumer-voice.org/food/ketchup-and-sauces/",
+      "category_label": "ketchup and sauces",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "ketchup": {
+      "url": "https://consumer-voice.org/food/ketchup-and-sauces/",
+      "category_label": "ketchup and sauces",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "sauces": {
+      "url": "https://consumer-voice.org/food/ketchup-and-sauces/",
+      "category_label": "ketchup and sauces",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "packaged-drinking-water": {
+      "url": "https://consumer-voice.org/food/packaged-drinking-water/",
+      "category_label": "packaged drinking water",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "water": {
+      "url": "https://consumer-voice.org/food/packaged-drinking-water/",
+      "category_label": "packaged drinking water",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "biscuits": {
+      "url": "https://consumer-voice.org/category/product-ranking/",
+      "category_label": "Biscuits",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "biscuit": {
+      "url": "https://consumer-voice.org/category/product-ranking/",
+      "category_label": "Biscuits",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    }
+  },
+  "special_directories": {
+    "product_ranking": {
+      "url": "https://consumer-voice.org/category/product-ranking/",
+      "title": "Consumer Voice product rankings",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "comparative_tests": {
+      "url": "https://consumeraffairs.nic.in/consumer-corner/comparative-test-of-consumer-products-and-services",
+      "title": "Ministry of Consumer Affairs comparative tests",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    },
+    "fssai_home": {
+      "url": "https://www.fssai.gov.in",
+      "title": "FSSAI statutory portal",
+      "verified_at": "2026-10-25",
+      "verified_by": "analyst_manual_check"
+    }
+  }
+}

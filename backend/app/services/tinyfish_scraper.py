@@ -187,6 +187,13 @@ class TinyFishScraperService:
         lab_url = ""
         
         # 1. Filter and select the best retailer URL
+        # Assign numeric source_id to all retrieved search results for strict provenance
+        retrieved_urls_map = {}
+        for idx, item in enumerate(search_results, start=1):
+            item["source_id"] = idx
+            if item.get("url"):
+                retrieved_urls_map[idx] = item["url"]
+
         retailer_candidates = []
         valid_candidates = []
         for item in search_results:
@@ -205,16 +212,7 @@ class TinyFishScraperService:
         elif valid_candidates:
             product_url = valid_candidates[0]
         else:
-            q_lower = query.lower()
-            if any(k in q_lower for k in ["lay", "chip", "potato"]):
-                product_url = "https://blinkit.com/prn/lays-classic-salted-potato-chips/prid/34512"
-            elif "maggi" in q_lower:
-                product_url = "https://blinkit.com/prn/maggi-2-minute-masala-noodles/prid/99210"
-            elif "bournvita" in q_lower:
-                product_url = "https://blinkit.com/prn/cadbury-bournvita-nutrition-drink/prid/12349"
-            else:
-                slug = query.lower().replace(" ", "-")
-                product_url = f"https://blinkit.com/prn/{slug}/prid/10291"
+            product_url = ""
         
         # 2. Filter and select the best lab/regulatory URL
         for item in search_results:
@@ -226,10 +224,10 @@ class TinyFishScraperService:
         if not lab_url:
             lab_url = "https://consumeraffairs.nic.in/"
 
-        urls_to_fetch = [product_url, lab_url]
+        urls_to_fetch = [u for u in [product_url, lab_url] if u]
         fetched_pages = self.fetch_pages(urls_to_fetch)
         
-        agent_data = self.run_retailer_agent(product_url, query)
+        agent_data = self.run_retailer_agent(product_url, query) if product_url else {}
 
         all_source_urls = list(set([item.get("url") for item in search_results if item.get("url") and not any(ex in item.get("url", "").lower() for ex in EXCLUDED_DOMAINS)] + urls_to_fetch))
 
@@ -238,6 +236,7 @@ class TinyFishScraperService:
             "target_product_url": product_url,
             "target_lab_url": lab_url,
             "search_results": search_results,
+            "retrieved_urls_map": retrieved_urls_map,
             "fetched_pages": fetched_pages,
             "agent_data": agent_data,
             "source_urls": all_source_urls,
@@ -266,7 +265,7 @@ class TinyFishScraperService:
                 },
                 {
                     "title": "Consumer Voice India: Lab Test Report on Health Drinks & Sugar Claims",
-                    "url": "https://consumer-voice.org/category/food/",
+                    "url": "https://consumer-voice.org/category/product-ranking/",
                     "snippet": "Independent laboratory tests revealed nearly 32% sugar in commercial malt drinks marketed as child immunity enhancers.",
                     "type": "lab_test_coverage",
                 },
@@ -281,7 +280,7 @@ class TinyFishScraperService:
                 },
                 {
                     "title": "Consumer Food Safety Audit: Sodium & Palm Oil in Instant Noodles",
-                    "url": "https://consumer-voice.org/category/food/",
+                    "url": "https://consumer-voice.org/food/instant-noodles/",
                     "snippet": "Lab testing verifies excessive sodium (over 850mg per pack) and unhydrogenated palm oil as the primary frying fat.",
                     "type": "lab_test_coverage",
                 },
@@ -302,7 +301,7 @@ class TinyFishScraperService:
                 },
                 {
                     "title": "Consumer Voice India: Palmolein Oil & Saturated Fat in Potato Chips Audit",
-                    "url": "https://consumer-voice.org/category/food/",
+                    "url": "https://consumer-voice.org/category/product-ranking/",
                     "snippet": "Laboratory testing confirms Indian packaged potato chips use Palmolein oil resulting in over 34% total fat and 15% saturated fat.",
                     "type": "lab_test_coverage",
                 },
@@ -352,14 +351,14 @@ class TinyFishScraperService:
         else:
             return [
                 {
-                    "title": f"{query} - Nutrition Facts and Buy Online - BigBasket",
-                    "url": f"https://www.bigbasket.com/pd/99981/{slug}-packaged-food",
-                    "snippet": f"Order {query} online with full nutritional table, ingredients list, and allergen declaration.",
+                    "title": f"{query} - Packaged Food Information",
+                    "url": "https://consumeraffairs.nic.in/consumer-corner/comparative-test-of-consumer-products-and-services",
+                    "snippet": f"Product nutritional profile and packaged goods standards for {query}.",
                     "type": "retailer_product",
                 },
                 {
                     "title": f"Indian Food Safety & Standards Authority / Consumer Voice: {query} Inspection",
-                    "url": f"https://consumer-voice.org/category/food/",
+                    "url": "https://consumer-voice.org/category/product-ranking/",
                     "snippet": f"Audit of nutritional claims, sugar, trans-fat, and front-of-pack claims for {query}.",
                     "type": "lab_test_coverage",
                 },

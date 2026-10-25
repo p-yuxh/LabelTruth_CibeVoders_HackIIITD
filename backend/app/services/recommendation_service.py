@@ -1358,6 +1358,7 @@ class RecommendationService:
     ):
         start_live = time.time()
         cfg = self.config
+        initial_job_data = job_registry.get(job_id, {})
         subcat = subcategory or category or "Packaged Food"
         live_detail_budget = int(cfg["live_detail_budget"])
 
