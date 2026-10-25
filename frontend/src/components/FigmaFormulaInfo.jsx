@@ -1,6 +1,6 @@
 import React from 'react';
 
-export const formulaNotes = {
+const formulaNotes = {
   1: {
     title: 'Nutrient rating',
     formula: '1 if actual ≤ limit; otherwise min(10, 1 + ceil(excess × 9)), where excess = (actual − limit) / limit.',
