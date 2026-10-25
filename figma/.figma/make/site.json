@@ -1,0 +1,10 @@
+{
+  "description": "A polished landing page with background-free imagery, refined typography, and smooth scrolling for a clear, engaging browsing experience.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

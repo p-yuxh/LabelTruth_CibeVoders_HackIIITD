@@ -263,3 +263,4 @@ export function adaptAuditData(auditResult, activePreferences = []) {
     productImage: getCategoryFallbackImage(category, productName),
   };
 }
+

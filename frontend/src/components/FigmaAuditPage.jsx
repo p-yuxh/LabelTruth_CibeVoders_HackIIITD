@@ -722,3 +722,4 @@ export default function FigmaAuditPage({
     </main>
   );
 }
+
