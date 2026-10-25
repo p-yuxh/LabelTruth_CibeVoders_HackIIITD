@@ -38,6 +38,9 @@ class AuditOrchestrator:
         force_refresh: bool = False,
         conditions: Optional[List[str]] = None,
         user_allergens: Optional[List[str]] = None,
+        avoid_ingredients: Optional[List[str]] = None,
+        dietary_pattern: Optional[str] = "none",
+        nutrition_goals: Optional[List[str]] = None,
         profile: str = "general_health",
         share_of_daily: float = 0.15,
         **kwargs
@@ -86,6 +89,9 @@ class AuditOrchestrator:
                     product_data=product_data,
                     selected_conditions=selected_cond,
                     user_allergens=user_allergens or [],
+                    avoid_ingredients=avoid_ingredients or [],
+                    dietary_pattern=dietary_pattern or "none",
+                    nutrition_goals=nutrition_goals or [],
                 )
                 product_data["personalized_scoring"] = personalized_eval
 
@@ -111,15 +117,26 @@ class AuditOrchestrator:
                     evidence=product_data["independent_evidence"],
                 )
 
-                # Fetch candidate category products from evidence log
-                stmt_recs = select(EvidenceLog).order_by(EvidenceLog.created_at.desc()).limit(30)
-                recs_res = await session.execute(stmt_recs)
-                cached_recs = [r.product_data for r in recs_res.scalars().all() if r.product_data]
+                # Discovered category alternatives via TinyFish live internet scraping (no previous search logs)
+                p_name_val = product_data.get("product_name", {}).get("value", cleaned_query)
+                p_cat_val = product_data.get("category", {}).get("value", "") if isinstance(product_data.get("category"), dict) else str(product_data.get("category") or "")
+                p_subcat_val = product_data.get("subcategory", {}).get("value", "") if isinstance(product_data.get("subcategory"), dict) else str(product_data.get("subcategory") or "")
+
+                scraped_candidates = await asyncio.to_thread(
+                    self.scraper.scrape_category_alternatives,
+                    product_name=p_name_val,
+                    category=p_cat_val or "Packaged Food",
+                    subcategory=p_subcat_val,
+                    limit=20,
+                )
                 product_data["recommendations"] = self.scoring_engine.rank_recommendations(
                     current_product=product_data,
-                    candidate_products=cached_recs,
+                    candidate_products=scraped_candidates,
                     selected_conditions=selected_cond,
                     user_allergens=user_allergens or [],
+                    avoid_ingredients=avoid_ingredients or [],
+                    dietary_pattern=dietary_pattern or "none",
+                    nutrition_goals=nutrition_goals or [],
                 )
 
                 return {
@@ -143,21 +160,35 @@ class AuditOrchestrator:
             tinyfish_data=tinyfish_result,
             conditions=selected_cond,
             user_allergens=user_allergens or [],
+            avoid_ingredients=avoid_ingredients or [],
+            dietary_pattern=dietary_pattern or "none",
+            nutrition_goals=nutrition_goals or [],
             share_of_daily=share_of_daily,
         )
 
         normalized_data.pop("claim_integrity_score", None)
         normalized_data.pop("legacy_score", None)
 
-        # Generate category recommendations
-        stmt_recs = select(EvidenceLog).order_by(EvidenceLog.created_at.desc()).limit(30)
-        recs_res = await session.execute(stmt_recs)
-        cached_recs = [r.product_data for r in recs_res.scalars().all() if r.product_data]
+        # Generate category recommendations via TinyFish live internet scraping (no previous search logs)
+        p_name_val = normalized_data.get("product_name", {}).get("value", cleaned_query)
+        cat_val = normalized_data.get("category", {}).get("value") if isinstance(normalized_data.get("category"), dict) else str(normalized_data.get("category") or "")
+        subcat_val = normalized_data.get("subcategory", {}).get("value") if isinstance(normalized_data.get("subcategory"), dict) else str(normalized_data.get("subcategory") or "")
+
+        scraped_candidates = await asyncio.to_thread(
+            self.scraper.scrape_category_alternatives,
+            product_name=p_name_val,
+            category=cat_val or "Packaged Food",
+            subcategory=subcat_val,
+            limit=20,
+        )
         normalized_data["recommendations"] = self.scoring_engine.rank_recommendations(
             current_product=normalized_data,
-            candidate_products=cached_recs,
+            candidate_products=scraped_candidates,
             selected_conditions=selected_cond,
             user_allergens=user_allergens or [],
+            avoid_ingredients=avoid_ingredients or [],
+            dietary_pattern=dietary_pattern or "none",
+            nutrition_goals=nutrition_goals or [],
         )
 
         # Step 4: Persist to PostgreSQL Evidence Log

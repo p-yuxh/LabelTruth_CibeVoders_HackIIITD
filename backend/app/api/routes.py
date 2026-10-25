@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
@@ -33,6 +34,7 @@ orchestrator = AuditOrchestrator()
 image_detector = ProductImageDetector()
 scoring_engine = PersonalizedScoringEngine()
 from app.services.recommendation_service import recommendation_service
+from app.services.tinyfish_scraper import tinyfish_scraper
 standards_registry = ReferenceStandardsRegistry()
 
 
@@ -62,6 +64,9 @@ async def audit_product(
             force_refresh=request.force_refresh,
             conditions=conditions,
             user_allergens=request.user_allergens or [],
+            avoid_ingredients=request.avoid_ingredients or [],
+            dietary_pattern=request.dietary_pattern or "none",
+            nutrition_goals=request.nutrition_goals or [],
         )
         return result
     except HTTPException:
@@ -209,6 +214,9 @@ async def score_personal(request: PersonalizeRequest):
         product_data=request.product_data,
         selected_conditions=conditions,
         user_allergens=request.user_allergens or [],
+        avoid_ingredients=request.avoid_ingredients or [],
+        dietary_pattern=request.dietary_pattern or "none",
+        nutrition_goals=request.nutrition_goals or [],
     )
     return score_result
 
@@ -266,10 +274,18 @@ async def get_recommendations(
     db: AsyncSession = Depends(get_db),
 ):
     conditions = request.conditions or ([request.profile] if request.profile else ["general_health"])
-    stmt = select(EvidenceLog).order_by(desc(EvidenceLog.created_at)).limit(50)
-    db_res = await db.execute(stmt)
-    records = db_res.scalars().all()
-    candidate_products = [r.product_data for r in records if r.product_data]
+    p_data = request.product_data or {}
+    p_name = p_data.get("product_name", {}).get("value", "") if isinstance(p_data.get("product_name"), dict) else str(p_data.get("product_name") or "")
+    p_cat = p_data.get("category", {}).get("value", "") if isinstance(p_data.get("category"), dict) else str(p_data.get("category") or "")
+    p_subcat = p_data.get("subcategory", {}).get("value", "") if isinstance(p_data.get("subcategory"), dict) else str(p_data.get("subcategory") or "")
+
+    candidate_products = await asyncio.to_thread(
+        tinyfish_scraper.scrape_category_alternatives,
+        product_name=p_name,
+        category=p_cat or "Packaged Food",
+        subcategory=p_subcat,
+        limit=30,
+    )
 
     ranked = scoring_engine.rank_recommendations(
         current_product=request.product_data,

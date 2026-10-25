@@ -9,6 +9,9 @@ class AuditRequest(BaseModel):
     conditions: Optional[List[str]] = Field(default_factory=lambda: ["general_health"], description="List of health profiles / conditions (e.g. general_health, diabetes, hypertension, protein_conscious)")
     profile: Optional[str] = Field("general_health", description="Selected single health condition (legacy alias)")
     user_allergens: Optional[List[str]] = Field(default_factory=list, description="User declared allergens (e.g. peanut, milk, gluten, soy)")
+    avoid_ingredients: Optional[List[str]] = Field(default_factory=list, description="Section 04 ingredients to avoid")
+    dietary_pattern: Optional[str] = Field("none", description="Section 05 dietary pattern (vegetarian, vegan, jain, etc.)")
+    nutrition_goals: Optional[List[str]] = Field(default_factory=list, description="Section 03 nutrition goals")
 
 
 class PersonalizeRequest(BaseModel):
@@ -17,6 +20,9 @@ class PersonalizeRequest(BaseModel):
     conditions: Optional[List[str]] = Field(default_factory=lambda: ["general_health"], description="List of health profiles / conditions")
     profile: Optional[str] = Field("general_health", description="Legacy single profile key")
     user_allergens: Optional[List[str]] = Field(default_factory=list, description="User declared allergens")
+    avoid_ingredients: Optional[List[str]] = Field(default_factory=list, description="Section 04 ingredients to avoid")
+    dietary_pattern: Optional[str] = Field("none", description="Section 05 dietary pattern")
+    nutrition_goals: Optional[List[str]] = Field(default_factory=list, description="Section 03 nutrition goals")
 
 
 class ValueWithSource(BaseModel):

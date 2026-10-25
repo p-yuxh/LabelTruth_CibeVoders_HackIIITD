@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, AlertTriangle, CheckCircle, ExternalLink, ChevronDown, ChevronUp, AlertOctagon } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, CheckCircle, ExternalLink, ChevronDown, ChevronUp, AlertOctagon, Check, Leaf } from 'lucide-react';
 import { calculatePersonalizedScore, fetchProductAlternatives } from '../services/api';
 import { getRatingStyle } from '../utils/themeHelpers';
 import PersonalizedRatingBar from './PersonalizedRatingBar';
+import { useAuth } from '../context/AuthContext';
 
 const AVAILABLE_PROFILES = [
   { key: 'general_health', label: 'General Health-Aware', desc: 'ICMR-NIN 2024 everyday nutritional guidelines.' },
@@ -16,13 +17,23 @@ const COMMON_ALLERGENS = [
   'Milk / Dairy',
   'Peanuts',
   'Tree Nuts',
+  'Eggs',
   'Soy',
   'Mustard',
+  'Sesame',
+  'Fish / Shellfish',
 ];
 
 export default function PersonalizedScoringSection({ productData, initialScoring }) {
-  const [selectedConditions, setSelectedConditions] = useState(['general_health']);
-  const [selectedAllergens, setSelectedAllergens] = useState([]);
+  const { profile } = useAuth();
+  const [selectedConditions, setSelectedConditions] = useState(() => {
+    return (profile?.dietary_conditions && profile.dietary_conditions.length > 0)
+      ? profile.dietary_conditions
+      : ['general_health'];
+  });
+  const [selectedAllergens, setSelectedAllergens] = useState(() => {
+    return profile?.allergies || [];
+  });
   const [scoreData, setScoreData] = useState(initialScoring || null);
   const [alternativesData, setAlternativesData] = useState(() => {
     if (productData?.alternatives && productData.alternatives.status) {
@@ -46,6 +57,18 @@ export default function PersonalizedScoringSection({ productData, initialScoring
       }
     }
   }, [initialScoring]);
+
+  // Synchronize with user profile when profile is updated
+  useEffect(() => {
+    if (profile) {
+      if (profile.dietary_conditions && profile.dietary_conditions.length > 0) {
+        setSelectedConditions(profile.dietary_conditions);
+      }
+      if (profile.allergies) {
+        setSelectedAllergens(profile.allergies);
+      }
+    }
+  }, [profile]);
 
   useEffect(() => {
     let isMounted = true;
@@ -71,6 +94,9 @@ export default function PersonalizedScoringSection({ productData, initialScoring
         product_data: productData,
         conditions,
         user_allergens: allergens,
+        avoid_ingredients: profile?.avoid_ingredients || [],
+        dietary_pattern: profile?.dietary_pattern || 'none',
+        nutrition_goals: profile?.nutrition_goals || [],
       });
       setScoreData(res);
     } catch (err) {
@@ -207,6 +233,90 @@ export default function PersonalizedScoringSection({ productData, initialScoring
               This product contains confirmed ingredients declared in your allergen restrictions.
               Per clinical safety protocols, nutritional ratings are withheld to prevent consumption.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* 2b. DIETARY PATTERN CHECK (Vegetarian, Vegan, Jain, etc.) */}
+      {scoreData.dietary_pattern_check && scoreData.dietary_pattern_check.pattern_id !== 'none' && (
+        <div
+          className={`allergy-bar ${scoreData.dietary_pattern_check.is_compliant ? 'alert-safe' : 'alert-danger'}`}
+          style={{ marginTop: '12px' }}
+        >
+          <div className="allergy-bar-content">
+            {scoreData.dietary_pattern_check.is_compliant ? (
+              <CheckCircle size={20} className="allergy-icon safe" />
+            ) : (
+              <AlertOctagon size={20} className="allergy-icon danger" />
+            )}
+            <div>
+              <div className="allergy-status-heading">
+                DIETARY PATTERN: <strong>{scoreData.dietary_pattern_check.pattern_name.toUpperCase()} {scoreData.dietary_pattern_check.is_compliant ? 'COMPLIANT' : 'CONFLICT DETECTED'}</strong>
+              </div>
+              <div className="allergy-status-msg">{scoreData.dietary_pattern_check.message}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2c. INGREDIENTS TO AVOID CHECK */}
+      {scoreData.avoid_ingredients_check && scoreData.avoid_ingredients_check.has_conflict && (
+        <div className="allergy-bar alert-warning" style={{ marginTop: '12px' }}>
+          <div className="allergy-bar-content">
+            <AlertTriangle size={20} className="allergy-icon warning" />
+            <div>
+              <div className="allergy-status-heading">
+                INGREDIENTS TO AVOID: <strong>{scoreData.avoid_ingredients_check.status}</strong>
+              </div>
+              <div className="allergy-status-msg">{scoreData.avoid_ingredients_check.message}</div>
+              <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {scoreData.avoid_ingredients_check.avoided_ingredients_found?.map((av) => (
+                  <span
+                    key={av.id}
+                    style={{
+                      backgroundColor: '#78350f',
+                      color: '#fef3c7',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ⚠ {av.label} ({av.matched_terms?.join(', ')})
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2d. NUTRITION GOALS ALIGNMENT */}
+      {scoreData.nutrition_goals_check && scoreData.nutrition_goals_check.has_goals && (
+        <div style={{ marginTop: '12px', padding: '12px 16px', backgroundColor: '#111827', border: '1px solid #1f2937', borderRadius: '8px' }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#9ca3af', marginBottom: '8px' }}>
+            Nutrition Goals Alignment ({scoreData.nutrition_goals_check.met_count}/{scoreData.nutrition_goals_check.total_count} Met)
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {scoreData.nutrition_goals_check.goals?.map((g) => (
+              <span
+                key={g.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  backgroundColor: g.is_met ? '#064e3b' : '#374151',
+                  color: g.is_met ? '#6ee7b7' : '#d1d5db',
+                  border: `1px solid ${g.is_met ? '#059669' : '#4b5563'}`,
+                }}
+              >
+                {g.is_met ? '✓' : '—'} {g.label}: {g.status_text}
+              </span>
+            ))}
           </div>
         </div>
       )}

@@ -6,7 +6,10 @@ export async function auditProduct(
   profile = 'general_health',
   shareOfDaily = 0.15,
   conditions = null,
-  userAllergens = null
+  userAllergens = null,
+  avoidIngredients = null,
+  dietaryPattern = 'none',
+  nutritionGoals = null
 ) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -24,6 +27,9 @@ export async function auditProduct(
         share_of_daily: shareOfDaily,
         conditions: conditions || (profile ? [profile] : ['general_health']),
         user_allergens: userAllergens || [],
+        avoid_ingredients: avoidIngredients || [],
+        dietary_pattern: dietaryPattern || 'none',
+        nutrition_goals: nutritionGoals || [],
       }),
       signal: controller.signal,
     });
@@ -161,7 +167,10 @@ export async function apiGetIndependentEvidence(query = '', productName = '', br
 export async function calculatePersonalizedScore(
   productData,
   conditions = ['general_health'],
-  userAllergens = []
+  userAllergens = [],
+  avoidIngredients = [],
+  dietaryPattern = 'none',
+  nutritionGoals = []
 ) {
   try {
     const payload = productData && typeof productData === 'object' && productData.product_data
@@ -169,11 +178,17 @@ export async function calculatePersonalizedScore(
           product_data: productData.product_data,
           conditions: productData.conditions || ['general_health'],
           user_allergens: productData.user_allergens || [],
+          avoid_ingredients: productData.avoid_ingredients || avoidIngredients || [],
+          dietary_pattern: productData.dietary_pattern || dietaryPattern || 'none',
+          nutrition_goals: productData.nutrition_goals || nutritionGoals || [],
         }
       : {
           product_data: productData,
           conditions: Array.isArray(conditions) ? conditions : [conditions || 'general_health'],
-          user_allergens: userAllergens,
+          user_allergens: userAllergens || [],
+          avoid_ingredients: avoidIngredients || [],
+          dietary_pattern: dietaryPattern || 'none',
+          nutrition_goals: nutritionGoals || [],
         };
 
     const response = await fetch(`${API_BASE}/score-personal`, {

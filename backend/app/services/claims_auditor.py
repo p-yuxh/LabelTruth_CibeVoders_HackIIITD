@@ -15,9 +15,15 @@ PALM_OIL_TERMS = [
 
 # Common allergens in Indian FMCG
 ALLERGEN_TERMS = [
-    "wheat", "gluten", "maida", "milk", "dairy", "casein", "lactose", "whey",
-    "soy", "soya", "peanut", "nut", "almond", "cashew", "walnut", "pistachio",
-    "sulphite", "sesame", "mustard", "egg", "fish"
+    "wheat", "gluten", "maida", "atta", "suji", "sooji", "rava", "semolina", "barley", "malt", "rye",
+    "milk", "dairy", "casein", "caseinate", "lactose", "whey", "butter", "ghee", "paneer", "curd", "dahi", "yogurt", "cheese", "cream",
+    "soy", "soya", "soybean", "lecithin", "322", "tofu",
+    "peanut", "groundnut", "arachis", "mungfali",
+    "nut", "almond", "badam", "cashew", "kaju", "walnut", "akhrot", "pistachio", "pista", "hazelnut", "pecan", "macadamia",
+    "sulphite", "sulfite", "sesame", "til", "gingelly", "tahini",
+    "mustard", "sarson", "rai",
+    "egg", "albumin", "mayonnaise", "mayo",
+    "fish", "shellfish", "prawn", "shrimp", "crab", "lobster", "tuna"
 ]
 
 # Common food additives & INS regex
@@ -52,6 +58,9 @@ class LabelTruthClaimsAuditor:
         tinyfish_data: Dict[str, Any],
         conditions: Optional[List[str]] = None,
         user_allergens: Optional[List[str]] = None,
+        avoid_ingredients: Optional[List[str]] = None,
+        dietary_pattern: Optional[str] = "none",
+        nutrition_goals: Optional[List[str]] = None,
         profile: str = "general_health",
         share_of_daily: float = 0.15,
         **kwargs,
@@ -117,6 +126,9 @@ class LabelTruthClaimsAuditor:
             },
             selected_conditions=selected_conditions,
             user_allergens=user_allergens or [],
+            avoid_ingredients=avoid_ingredients or [],
+            dietary_pattern=dietary_pattern or "none",
+            nutrition_goals=nutrition_goals or [],
         )
 
         # 8. Statutory Reference Standards Registry

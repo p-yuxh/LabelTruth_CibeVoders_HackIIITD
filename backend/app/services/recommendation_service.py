@@ -3,12 +3,14 @@ import logging
 import os
 import hashlib
 import time
+import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from sqlalchemy import select, or_, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.evidence_log import EvidenceLog
 from app.services.personalized_scoring import PersonalizedScoringEngine, CATEGORY_REFERENCE_PRODUCTS
+from app.services.tinyfish_scraper import tinyfish_scraper
 
 logger = logging.getLogger("labeltruth.recommendation")
 
@@ -341,13 +343,24 @@ class RecommendationService:
                 "disclaimer": "Ratings are computed for your profile; lower is better. Always check physical packaging for current ingredients and allergen warnings.",
             }
 
+        # Gate conditions integration: coeliac_disease -> gluten, lactose_intolerance -> milk
+        active_allergens = list(user_allergens or [])
+        for cond in conditions:
+            c_lower = str(cond).lower().strip()
+            if any(k in c_lower for k in ["coeliac", "celiac"]):
+                if not any(a.lower() in ["gluten", "wheat"] for a in active_allergens):
+                    active_allergens.append("gluten")
+            elif any(k in c_lower for k in ["lactose"]):
+                if not any(a.lower() in ["milk", "dairy", "lactose"] for a in active_allergens):
+                    active_allergens.append("milk")
+
         # -------------------------------------------------------------
         # 1. EVALUATE SEARCHED PRODUCT FOR TRIGGER CONDITIONS
         # -------------------------------------------------------------
         p_eval = self.scoring_engine.evaluate(
             product_data=searched_product_data,
             selected_conditions=conditions,
-            user_allergens=user_allergens,
+            user_allergens=active_allergens,
         )
 
         p_rating = p_eval.get("product_rating")
@@ -433,43 +446,23 @@ class RecommendationService:
         else:
             p_name = str(p_name_item or "").strip().lower()
 
+        # TinyFish live category scraping - candidates are discovered strictly from internet scraping
+        # and NEVER retrieved from previous search logs in EvidenceLog
         candidate_pool: List[Dict[str, Any]] = []
+        try:
+            candidate_pool = await asyncio.to_thread(
+                tinyfish_scraper.scrape_category_alternatives,
+                product_name=p_name or "",
+                category=p_cat or p_subcat or "Packaged Food",
+                subcategory=p_subcat,
+                limit=cfg.get("candidate_pool_size", 50),
+            )
+        except Exception as err:
+            logger.warning(f"Error fetching live alternatives via TinyFish: {err}")
+            candidate_pool = []
 
-        if session is not None:
-            # Query candidate pool in SQL:
-            # Filter category/subcategory, exclude searched product, limit candidate_pool_size
-            stmt = select(EvidenceLog)
-            if searched_product_id is not None:
-                stmt = stmt.where(EvidenceLog.id != searched_product_id)
-
-            # Subcategory match level first
-            if cfg.get("category_match_level") == "subcategory" and p_subcat:
-                stmt_subcat = stmt.where(EvidenceLog.subcategory == p_subcat).limit(cfg["candidate_pool_size"])
-                res_subcat = await session.execute(stmt_subcat)
-                records = res_subcat.scalars().all()
-                if len(records) >= cfg["max_results"]:
-                    candidate_pool.extend([r.product_data for r in records if r.product_data])
-
-            # If subcategory yielded too few candidates, fall back to category
-            if len(candidate_pool) < cfg["max_results"] and p_cat:
-                stmt_cat = stmt.where(EvidenceLog.category == p_cat).limit(cfg["candidate_pool_size"])
-                res_cat = await session.execute(stmt_cat)
-                records_cat = res_cat.scalars().all()
-                for r in records_cat:
-                    if r.product_data and r.product_data not in candidate_pool:
-                        candidate_pool.append(r.product_data)
-
-            # If still few candidates, pull recent general records
-            if len(candidate_pool) < cfg["max_results"]:
-                stmt_gen = stmt.order_by(desc(EvidenceLog.created_at)).limit(cfg["candidate_pool_size"])
-                res_gen = await session.execute(stmt_gen)
-                records_gen = res_gen.scalars().all()
-                for r in records_gen:
-                    if r.product_data and r.product_data not in candidate_pool:
-                        candidate_pool.append(r.product_data)
-
-        # Merge with built-in CATEGORY_REFERENCE_PRODUCTS for category coverage
-        combined_candidates = candidate_pool + CATEGORY_REFERENCE_PRODUCTS
+        # Use discovered category candidate pool, or reference pool if candidate pool is empty
+        combined_candidates = candidate_pool if candidate_pool else CATEGORY_REFERENCE_PRODUCTS
         seen_names = set()
         unique_candidates = []
         for c in combined_candidates:
@@ -534,7 +527,16 @@ class RecommendationService:
             c_oil = c_oil_item.get("value", "") if isinstance(c_oil_item, dict) else str(c_oil_item or "")
 
             # Run existing allergy check
-            allergy_res = self.scoring_engine.check_allergens(c_ingredients, c_oil, user_allergens)
+            c_name_val = ""
+            c_n_item = cand.get("product_name", {})
+            if isinstance(c_n_item, dict):
+                c_name_val = str(c_n_item.get("value", ""))
+            else:
+                c_name_val = str(c_n_item or "")
+
+            allergy_res = self.scoring_engine.check_allergens(
+                c_ingredients, c_oil, active_allergens, product_name=c_name_val
+            )
 
             if allergy_res["allergy_status"] == "CANNOT CONFIRM":
                 filter_rejection_counts["allergen_unknown"] += 1
@@ -547,7 +549,7 @@ class RecommendationService:
 
             # Also check may_contain_allergens field if present
             may_contain = cand.get("may_contain_allergens", []) or []
-            if any(ua.lower() in [m.lower() for m in may_contain] for ua in user_allergens):
+            if any(ua.lower() in [m.lower() for m in may_contain] for ua in active_allergens):
                 filter_rejection_counts["allergen_unsafe"] += 1
                 continue
 

@@ -53,6 +53,9 @@ function MainApp() {
         ? profile.dietary_conditions
         : ['general_health'];
       const activeAllergens = profile?.allergies || [];
+      const activeAvoids = profile?.avoid_ingredients || [];
+      const activePattern = profile?.dietary_pattern || 'none';
+      const activeGoals = profile?.nutrition_goals || [];
 
       const res = await auditProduct(
         query,
@@ -60,7 +63,10 @@ function MainApp() {
         'general_health',
         0.15,
         activeConditions,
-        activeAllergens
+        activeAllergens,
+        activeAvoids,
+        activePattern,
+        activeGoals
       );
       timers.forEach(clearTimeout);
       setAuditResult(res);
@@ -113,11 +119,17 @@ function MainApp() {
           ? newProfile.dietary_conditions
           : ['general_health'];
         const allergens = newProfile.allergies || [];
+        const avoids = newProfile.avoid_ingredients || [];
+        const pattern = newProfile.dietary_pattern || 'none';
+        const goals = newProfile.nutrition_goals || [];
 
         const newScores = await calculatePersonalizedScore({
           product_data: auditResult.data,
           conditions,
           user_allergens: allergens,
+          avoid_ingredients: avoids,
+          dietary_pattern: pattern,
+          nutrition_goals: goals,
         });
 
         setAuditResult((prev) => ({
